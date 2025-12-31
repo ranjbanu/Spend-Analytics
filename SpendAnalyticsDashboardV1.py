@@ -140,7 +140,16 @@ def load_data(file):
 
     return df
 
+# --------------------------------------------------
+# Sidebar
+# --------------------------------------------------
+st.sidebar.header("📂 Data & Filters")
 
+uploaded_file = st.sidebar.file_uploader(
+    "Upload CSV (optional)", type="csv"
+)
+
+df = load_data(uploaded_file)
 # -----------------------------------------
 # Filters
 # -----------------------------------------
