@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[8]:
+# In[2]:
 
 
 
@@ -196,8 +196,8 @@ if "On_Time_Delivery" in dff.columns:
 else:
     kpi(c4, "OTD %", "N/A")
 
-kpi(c5, "Actual Spend (₹)", f"{safe_sum(dff, 'actual_spend')/100000:,.2f}")
-kpi(c6, "Savings (₹)", f"{safe_sum(dff, 'savings')/100000:,.2f}")
+kpi(c5, "Actual Spend (in million)", f"{safe_sum(dff, 'actual_spend')/1000000:,.2f}")
+kpi(c6, "Savings (in million)", f"{safe_sum(dff, 'savings')/1000000:,.2f}")
 
 
 
