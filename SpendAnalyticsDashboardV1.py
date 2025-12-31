@@ -59,10 +59,58 @@ def to_cr(value):
 # Data Loading
 # -----------------------------------------
 @st.cache_data(ttl=600)
-def load_data(uploaded_file):
-    if uploaded_file is None:
-        return pd.DataFrame()
-    df = pd.read_csv(uploaded_file)
+# --------------------------------------------------
+# Load data
+# --------------------------------------------------
+def load_data(file):
+    if file:
+        df = pd.read_csv(file)
+    else:
+        if not os.path.exists(DEFAULT_CSV):
+            st.error("Default CSV not found. Please upload a file.")
+            return pd.DataFrame()
+        df = pd.read_csv(DEFAULT_CSV)
+
+    df = parse_dates(df)
+    df = parse_numbers(df)
+
+    # Derived metrics
+    if {"Quantity", "Unit_Price"}.issubset(df.columns):
+        df["actual_spend"] = (
+            df["Quantity"].fillna(0) * df["Unit_Price"].fillna(0)
+            + df.get("Tax_Amount", 0).fillna(0)
+            + df.get("Freight_Cost", 0).fillna(0)
+        )
+
+    if {"Quantity", "Negotiated_Price"}.issubset(df.columns):
+        df["negotiated_spend"] = (
+            df["Quantity"].fillna(0) * df["Negotiated_Price"].fillna(0)
+        )
+
+    if {"Unit_Price", "Negotiated_Price", "Quantity"}.issubset(df.columns):
+        df["savings"] = (
+            np.maximum(df["Unit_Price"] - df["Negotiated_Price"], 0)
+            * df["Quantity"].fillna(0)
+        )
+
+    # Aging bucket
+    if "Invoice_Date" in df.columns:
+        today = pd.to_datetime(date.today())
+        df["Age_Days"] = (today - df["Invoice_Date"]).dt.days
+
+        def bucket(x):
+            if pd.isna(x):
+                return "Unpaid"
+            if x <= 30:
+                return "0-30"
+            if x <= 60:
+                return "31-60"
+            if x <= 90:
+                return "61-90"
+            return ">90"
+
+        df["Aging_Bucket"] = df["Age_Days"].apply(bucket)
+
     return df
 
 # -----------------------------------------
@@ -80,44 +128,7 @@ df = load_data(uploaded_file)
 if df.empty:
     st.info("⬅️ Upload a CSV file to begin analysis")
     st.stop()
-# -----------------------------------------
-# Derived Metrics
-# -----------------------------------------
-if {"Quantity", "Unit_Price"}.issubset(df.columns):
-    df["actual_spend"] = (
-        df["Quantity"].fillna(0) * df["Unit_Price"].fillna(0)
-        + df.get("Tax_Amount", 0).fillna(0)
-        + df.get("Freight_Cost", 0).fillna(0)
-    )
 
-if {"Quantity", "Negotiated_Price"}.issubset(df.columns):
-    df["negotiated_spend"] = (
-        df["Quantity"].fillna(0) * df["Negotiated_Price"].fillna(0)
-    )
-
-if {"Unit_Price", "Negotiated_Price", "Quantity"}.issubset(df.columns):
-    df["savings"] = (
-        np.maximum(df["Unit_Price"] - df["Negotiated_Price"], 0)
-        * df["Quantity"].fillna(0)
-    )
-
-# Aging bucket
-if "Invoice_Date" in df.columns:
-    today = pd.to_datetime(date.today())
-    df["Age_Days"] = (today - df["Invoice_Date"]).dt.days
-
-    def bucket(x):
-        if pd.isna(x):
-            return "Unpaid"
-        if x <= 30:
-            return "0-30"
-        if x <= 60:
-            return "31-60"
-        if x <= 90:
-            return "61-90"
-        return ">90"
-
-    df["Aging_Bucket"] = df["Age_Days"].apply(bucket)
 # -----------------------------------------
 # Filters
 # -----------------------------------------
