@@ -79,7 +79,20 @@ df = load_data(uploaded_file)
 if df.empty:
     st.info("⬅️ Upload a CSV file to begin analysis")
     st.stop()
+# -----------------------------------------
+# Derived Metrics
+# -----------------------------------------
+if "actual_spend" not in df.columns:
+    qty = df.get("Quantity", 0).fillna(0)
+    unit = df.get("Unit_Price", 0).fillna(0)
+    tax = df.get("Tax_Amount", 0).fillna(0)
+    freight = df.get("Freight_Cost", 0).fillna(0)
 
+    df["actual_spend"] = (qty * unit) + tax + freight
+
+if "savings" not in df.columns and "Negotiated_Price" in df.columns:
+    negotiated = df.get("Negotiated_Price", 0).fillna(0)
+    df["savings"] = np.maximum(unit - negotiated, 0) * qty
 # -----------------------------------------
 # Filters
 # -----------------------------------------
