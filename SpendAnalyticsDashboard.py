@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 
@@ -174,9 +174,9 @@ dff = df[mask].copy()
 # --------------------------------------------------
 # KPI Cards
 # --------------------------------------------------
-c1, c2, c3, c4, c5, c6 = st.beta_columns(6)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 
-kpi(c1, "Total POs", f"{len(dff):,}")
+kpi(c1, "Total POs", f"{len(dff):}")
 
 if "Order_Status" in dff.columns:
     delivered_pct = dff["Order_Status"].eq("Delivered").mean() * 100
@@ -204,7 +204,7 @@ kpi(c6, "Savings (in million)", f"{safe_sum(dff, 'savings')/1000000:,.2f}")
 # --------------------------------------------------
 # Charts
 # --------------------------------------------------
-col1, col2 = st.beta_columns(2)
+col1, col2 = st.columns(2)
 
 if "Item_Category" in dff.columns:
     fig = px.bar(
@@ -225,7 +225,7 @@ if "Supplier" in dff.columns:
     )
     col2.plotly_chart(fig, use_container_width=True)
 
-col1, col2 = st.beta_columns(2)
+col1, col2 = st.columns(2)
 # --------------------------------------------------
 # Aging
 # --------------------------------------------------
@@ -304,6 +304,7 @@ else:
 
 
 
+pip install --upgrade streamlit 
 
 
 # In[ ]:
