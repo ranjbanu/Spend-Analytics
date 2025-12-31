@@ -24,8 +24,6 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Spend Analytics & P2P Dashboard")
-
 DEFAULT_CSV = "Procurement_KPI_Analysis_with_Invoices_projected.csv"
 
 DATE_COLS = [
@@ -85,6 +83,9 @@ def parse_numbers(df):
 def safe_unique(df, col):
     return sorted(df[col].dropna().unique()) if col in df.columns else []
 
+def to_cr(value):
+    """Convert to Crores"""
+    return value / 1e7
 
 # --------------------------------------------------
 # Load data
