@@ -196,8 +196,8 @@ if "On_Time_Delivery" in dff.columns:
 else:
     kpi(c4, "OTD %", "N/A")
 
-kpi(c5, "Actual Spend (in million)", f"{safe_sum(dff, 'actual_spend')/1000000:,.2f}")
-kpi(c6, "Savings (in million)", f"{safe_sum(dff, 'savings')/1000000:,.2f}")
+kpi(c5, "Actual Spend (in mn)", f"{safe_sum(dff, 'actual_spend')/1000000:,.2f}")
+kpi(c6, "Savings (in mn)", f"{safe_sum(dff, 'savings')/1000000:,.2f}")
 
 
 
