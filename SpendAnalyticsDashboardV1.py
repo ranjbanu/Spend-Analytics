@@ -269,10 +269,10 @@ if exceptions:
     exceptions_df = pd.concat(exceptions)
 
     ex_counts = (
-        exceptions_df["Exception"]
-        .value_counts()
-        .reset_index()
-        .rename(columns={"index": "Exception", "Exception": "Count"})
+        exceptions_df
+        .groupby("Exception")
+        .size()
+        .reset_index(name="Count")
     )
 
     fig_ex = px.pie(
