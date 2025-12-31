@@ -174,18 +174,14 @@ st.caption("Executive overview of procurement spend, savings & risks")
 # KPI Row
 # -----------------------------------------
 k1, k2, k3, k4 = st.columns(4)
+kpi(k1, "Total POs", f"{len(df):,}")
 
-k1.metric(
-    "Total POs",
-    f"{len(df):,}"
-)
-
-k2.metric(
+kpi(k2,
     "Actual Spend (₹ Cr)",
     f"{to_cr(safe_sum(df,'actual_spend')):,.2f}"
 )
 
-k3.metric(
+kpi(k3,
     "Savings (₹ Cr)",
     f"{to_cr(safe_sum(df,'savings')):,.2f}"
 )
@@ -195,7 +191,7 @@ late_pct = (
     if "On_Time_Delivery" in df.columns else 0
 )
 
-k4.metric(
+kpi(k4,
     "Late Delivery %",
     f"{late_pct:.1f}%"
 )
