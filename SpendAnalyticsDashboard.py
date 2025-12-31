@@ -304,7 +304,6 @@ else:
 
 
 
-pip install --upgrade streamlit 
 
 
 # In[ ]:
