@@ -10,43 +10,40 @@
 # -----------------------------------------
 import os
 from datetime import date
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
 
-# -----------------------------------------
-# Page Config (MUST be first Streamlit call)
-# -----------------------------------------
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+# --------------------------------------------------
+# Page config
+# --------------------------------------------------
 st.set_page_config(
-    page_title="Spend Analytics Dashboard",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Spend Analytics + P2P Dashboard",
+    layout="wide"
 )
 
-# -----------------------------------------
-# Custom Styling (Dark, Professional)
-# -----------------------------------------
-st.markdown("""
-<style>
-.stApp {
-    background-color: #2b2b2b;
-    color: white;
-}
-h1, h2, h3, h4 {
-    color: #f5f5f5;
-}
-[data-testid="metric-container"] {
-    background-color: #3a3a3a;
-    border-radius: 8px;
-    padding: 12px;
-}
-</style>
-""", unsafe_allow_html=True)
+st.title("📊 Spend Analytics & P2P Dashboard")
 
-# -----------------------------------------
-# Utility Functions
-# -----------------------------------------
+DEFAULT_CSV = "Procurement_KPI_Analysis_with_Invoices_projected.csv"
+
+DATE_COLS = [
+    "Order_Date", "Delivery_Date", "Price_Effective_Date",
+    "Contract_Start_Date", "Contract_End_Date",
+    "Invoice_Date", "Invoice_Receipt_Date",
+    "Invoice_Due_Date", "Payment_Date"
+]
+
+NUM_COLS = [
+    "Quantity", "Unit_Price", "Negotiated_Price",
+    "Defective_Units", "Tax_Amount", "Freight_Cost",
+    "Invoice_Amount", "Projected_Price"
+]
+
+# --------------------------------------------------
+# Helper functions
+# --------------------------------------------------
 def kpi(container, label, value):
     container.markdown(
         f"""
@@ -88,10 +85,7 @@ def parse_numbers(df):
 def safe_unique(df, col):
     return sorted(df[col].dropna().unique()) if col in df.columns else []
 
-# -----------------------------------------
-# Data Loading
-# -----------------------------------------
-@st.cache_data(ttl=600)
+
 # --------------------------------------------------
 # Load data
 # --------------------------------------------------
@@ -146,21 +140,6 @@ def load_data(file):
 
     return df
 
-# -----------------------------------------
-# Sidebar
-# -----------------------------------------
-st.sidebar.title("📊 Spend Analytics")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload Procurement CSV",
-    type=["csv"]
-)
-
-df = load_data(uploaded_file)
-
-if df.empty:
-    st.info("⬅️ Upload a CSV file to begin analysis")
-    st.stop()
 
 # -----------------------------------------
 # Filters
