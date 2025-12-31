@@ -47,13 +47,46 @@ h1, h2, h3, h4 {
 # -----------------------------------------
 # Utility Functions
 # -----------------------------------------
+def kpi(container, label, value):
+    container.markdown(
+        f"""
+        <div style="padding:10px;border-radius:8px;
+                    background-color:#2e2e2e;
+                    color: white; 
+                    text-align:center">
+            <h4>{label}</h4>
+            <h2>{value}</h2>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 def safe_sum(df, col):
-    """Safely sum a column"""
     return df[col].sum() if col in df.columns else 0
 
-def to_cr(value):
-    """Convert to Crores"""
-    return value / 1e7
+    
+def parse_dates(df):
+    for col in DATE_COLS:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+    return df
+
+
+def parse_numbers(df):
+    for col in NUM_COLS:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.replace(r"[^\d\-.]", "", regex=True)
+                .replace("", np.nan)
+                .astype(float)
+            )
+    return df
+
+
+def safe_unique(df, col):
+    return sorted(df[col].dropna().unique()) if col in df.columns else []
 
 # -----------------------------------------
 # Data Loading
