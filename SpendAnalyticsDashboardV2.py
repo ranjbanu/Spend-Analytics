@@ -314,6 +314,70 @@ def ppv_by_category_and_supplier(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
 
 st.subheader("Purchase Price Variance (PPV Selected Period) – by Category & Supplier")
 
+
+# ---------------------------
+# Pie charts for PPV (Selected Period)
+# ---------------------------
+import plotly.express as px
+
+st.subheader("Pie Charts")
+
+# Prepare Category pie data (exclude zero/NaN PPV to avoid clutter)
+cat_pie = ppv_cat_sel.copy()
+cat_pie = cat_pie[(cat_pie["PPV_Value"].notna()) & (cat_pie["PPV_Value"] != 0)]
+cat_pie = cat_pie.sort_values("PPV_Value", ascending=False)
+
+# Prepare Supplier pie data (Top-N to keep the pie readable)
+TOP_N_SUPPLIERS = st.slider("Top-N suppliers for PPV pie", min_value=5, max_value=30, value=15, step=1)
+sup_pie = ppv_sup_sel.copy()
+sup_pie = sup_pie[(sup_pie["PPV_Value"].notna()) & (sup_pie["PPV_Value"] != 0)]
+sup_pie = sup_pie.sort_values("PPV_Value", ascending=False).head(TOP_N_SUPPLIERS)
+
+# Layout columns
+pie_left, pie_right = st.columns(2)
+
+# Pie 1: Category share of PPV value
+with pie_left:
+    st.caption("PPV value share by Item Category (selected period)")
+    if not cat_pie.empty:
+        fig_cat = px.pie(
+            cat_pie,
+            names="Item_Category",
+            values="PPV_Value",
+            hole=0.35,
+            title="PPV by Category",
+        )
+        # Rich tooltips
+        fig_cat.update_traces(
+            hovertemplate="<b>%{label}</b><br>PPV ₹%{value:,.0f}<br>PPV% %{customdata:.2f}%",
+            customdata=cat_pie["PPV_Pct"]
+        )
+        fig_cat.update_layout(legend_title_text="Category")
+        st.plotly_chart(fig_cat, use_container_width=True)
+    else:
+        st.info("No PPV data available for the selected period & filters.")
+
+# Pie 2: Supplier share of PPV value (Top-N)
+with pie_right:
+    st.caption(f"PPV value share by Supplier (Top {TOP_N_SUPPLIERS}, selected period)")
+    if not sup_pie.empty:
+        fig_sup = px.pie(
+            sup_pie,
+            names="Supplier",
+            values="PPV_Value",
+            hole=0.35,
+            title=f"PPV by Supplier (Top {TOP_N_SUPPLIERS})",
+        )
+        fig_sup.update_traces(
+            hovertemplate="<b>%{label}</b><br>PPV ₹%{value:,.0f}<br>PPV% %{customdata:.2f}%",
+            customdata=sup_pie["PPV_Pct"]
+        )
+        fig_sup.update_layout(legend_title_text="Supplier")
+        st.plotly_chart(fig_sup, use_container_width=True)
+    else:
+        st.info("No PPV data available for the selected period & filters.")
+
+
 ppv_cat_sel, ppv_sup_sel = ppv_by_category_and_supplier(filtered)
 
 c_left, c_right = st.columns(2)
