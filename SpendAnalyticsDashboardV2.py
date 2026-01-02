@@ -191,25 +191,8 @@ with t1:
 with t2:
     st.line_chart(mt.set_index("month")["mav_pct"], use_container_width=True)
 
-# ---------------------------
-# Drill-down: select category → supplier → documents
-# ---------------------------
-st.subheader("Drill-down Explorer")
-dd_cat = st.selectbox("Category", ["(All)"] + sorted(filtered["Item_Category"].dropna().unique().tolist()))
-dd_sup_options = filtered["Supplier"].dropna().unique().tolist()
-if dd_cat and dd_cat != "(All)":
-    dd_sup_options = filtered.loc[filtered["Item_Category"]==dd_cat, "Supplier"].dropna().unique().tolist()
-dd_sup = st.selectbox("Supplier", ["(All)"] + sorted(dd_sup_options))
-
-drill_mask = pd.Series(True, index=filtered.index)
-if dd_cat and dd_cat != "(All)":
-    drill_mask &= filtered["Item_Category"].eq(dd_cat)
-if dd_sup and dd_sup != "(All)":
-    drill_mask &= filtered["Supplier"].eq(dd_sup)
-drill = filtered[drill_mask].copy()
-
 # KPIs within drill slice
-dk = calc_kpis(drill)
+dk = calc_kpis(filtered)
 d1, d2, d3 = st.columns(3)
 d1.metric("Spend (slice)", fmt_inr(dk["total_spend"]))
 d2.metric("OTD (slice)", pct(dk["otd_pct"]) if dk["otd_pct"] is not None else "—")
