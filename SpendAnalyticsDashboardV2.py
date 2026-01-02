@@ -322,6 +322,7 @@ import plotly.express as px
 
 st.subheader("Pie Charts")
 
+ppv_cat_sel, ppv_sup_sel = ppv_by_category_and_supplier(filtered)
 # Prepare Category pie data (exclude zero/NaN PPV to avoid clutter)
 cat_pie = ppv_cat_sel.copy()
 cat_pie = cat_pie[(cat_pie["PPV_Value"].notna()) & (cat_pie["PPV_Value"] != 0)]
@@ -377,8 +378,6 @@ with pie_right:
     else:
         st.info("No PPV data available for the selected period & filters.")
 
-
-ppv_cat_sel, ppv_sup_sel = ppv_by_category_and_supplier(filtered)
 
 c_left, c_right = st.columns(2)
 
