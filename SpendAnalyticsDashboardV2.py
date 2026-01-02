@@ -8,20 +8,21 @@ from datetime import datetime, date, timedelta
 # ---------------------------
 # Page & Theme
 # ---------------------------
-st.set_page_config(page_title="Spend Analytics", page_icon="💸", layout="wide")
+st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout="wide")
+st.caption("Executive overview of procurement spend, savings & risks")
 
 # ---------------------------
 # Utils: currency formatting
 # ---------------------------
 def fmt_inr(x):
     try:
-        return f"₹{x:,.0f}"
+        return f"₹{x:,.2f}"
     except Exception:
         return "₹0"
 
 def pct(x):
     try:
-        return f"{x:.1f}%"
+        return f"{x:.2f}%"
     except Exception:
         return "–"
 
@@ -179,7 +180,7 @@ with right:
 # ---------------------------
 # Trend: monthly spend + maverick share
 # ---------------------------
-st.subheader("Monthly Trend")
+st.subheader("📈 Monthly Trend")
 mt = (filtered.groupby(["month"])
       .agg(total_spend=("Invoice_Amount","sum"),
            mav_spend=("is_maverick", lambda s: float(filtered.loc[s.index, "Invoice_Amount"][s].sum())))
@@ -225,25 +226,37 @@ st.dataframe(drill[[
 # ---------------------------
 # Anomalies Panel
 # ---------------------------
-st.subheader("Anomalies & Exceptions")
+st.subheader("🚨 Anomalies & Exceptions")
 an_tab1, an_tab2, an_tab3, an_tab4 = st.tabs(["Price mismatch", "Tax error", "Quantity mismatch", "Late payments"])
 
 with an_tab1:
     an1 = filtered[filtered["Invoice_Discrepancy_Reason"].eq("Price mismatch")]
     st.metric("Count", len(an1))
-    st.dataframe(an1.sort_values("Invoice_Date", ascending=False), use_container_width=True)
+    st.dataframe(an1[[
+    "PO_ID","Supplier","Invoice_Number","Invoice_Date","Invoice_Status","Item_Category","Spend_Category",
+    "Quantity","Unit_Price","Negotiated_Price","Invoice_Amount","On_Time_Delivery","Maverick_Flag",
+    "Invoice_Discrepancy_Reason","Payment_Date","Invoice_Due_Date"
+]].sort_values("Invoice_Date", ascending=False), use_container_width=True)
     st.download_button("Download CSV (Price mismatch)", data=an1.to_csv(index=False), file_name="price_mismatch.csv", mime="text/csv")
 
 with an_tab2:
     an2 = filtered[filtered["Invoice_Discrepancy_Reason"].eq("Tax error")]
     st.metric("Count", len(an2))
-    st.dataframe(an2.sort_values("Invoice_Date", ascending=False), use_container_width=True)
+    st.dataframe(an2[[
+    "PO_ID","Supplier","Invoice_Number","Invoice_Date","Invoice_Status","Item_Category","Spend_Category",
+    "Quantity","Unit_Price","Negotiated_Price","Invoice_Amount","On_Time_Delivery","Maverick_Flag",
+    "Invoice_Discrepancy_Reason","Payment_Date","Invoice_Due_Date"
+]].sort_values("Invoice_Date", ascending=False), use_container_width=True)
     st.download_button("Download CSV (Tax error)", data=an2.to_csv(index=False), file_name="tax_error.csv", mime="text/csv")
 
 with an_tab3:
     an3 = filtered[filtered["Invoice_Discrepancy_Reason"].eq("Quantity mismatch")]
     st.metric("Count", len(an3))
-    st.dataframe(an3.sort_values("Invoice_Date", ascending=False), use_container_width=True)
+    st.dataframe(an3[[
+    "PO_ID","Supplier","Invoice_Number","Invoice_Date","Invoice_Status","Item_Category","Spend_Category",
+    "Quantity","Unit_Price","Negotiated_Price","Invoice_Amount","On_Time_Delivery","Maverick_Flag",
+    "Invoice_Discrepancy_Reason","Payment_Date","Invoice_Due_Date"
+]].sort_values("Invoice_Date", ascending=False), use_container_width=True)
     st.download_button("Download CSV (Quantity mismatch)", data=an3.to_csv(index=False), file_name="qty_mismatch.csv", mime="text/csv")
 
 with an_tab4:
@@ -257,22 +270,81 @@ with an_tab4:
 # ---------------------------
 # PPV by category / supplier
 # ---------------------------
-st.subheader("Price Variance (PPV)")
-ppv_cat = (filtered.assign(ppv=(filtered["Unit_Price"]-filtered["Negotiated_Price"])*filtered["Quantity"])
-                      .groupby("Item_Category")
-                      .agg(ppv_value=("ppv","sum"),
-                           base=("Negotiated_Price", lambda s: float((s*filtered.loc[s.index, 'Quantity']).sum())))
-           )
-ppv_cat["ppv_pct"] = np.where(ppv_cat["base"]>0, ppv_cat["ppv_value"]/ppv_cat["base"]*100.0, np.nan)
-st.dataframe(ppv_cat.sort_values("ppv_value", ascending=False), use_container_width=True)
 
-ppv_sup = (filtered.assign(ppv=(filtered["Unit_Price"]-filtered["Negotiated_Price"])*filtered["Quantity"])
-                      .groupby("Supplier")
-                      .agg(ppv_value=("ppv","sum"),
-                           base=("Negotiated_Price", lambda s: float((s*filtered.loc[s.index, 'Quantity']).sum())))
-           )
-ppv_sup["ppv_pct"] = np.where(ppv_sup["base"]>0, ppv_sup["ppv_value"]/ppv_sup["base"]*100.0, np.nan)
-st.dataframe(ppv_sup.sort_values("ppv_value", ascending=False).head(20), use_container_width=True)
+# ---------------------------
+# PPV for the selected period (respects sidebar filters)
+# ---------------------------
+def ppv_by_category_and_supplier(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Computes PPV over the FILTERED slice `d`.
+      PPV value = Σ (Unit_Price - Negotiated_Price) * Quantity
+      PPV %     = PPV value ÷ Σ (Negotiated_Price * Quantity)
+
+    Returns (ppv_cat_df, ppv_sup_df) both sorted by PPV value desc.
+    """
+    if d.empty:
+        return (pd.DataFrame(columns=["Item_Category", "ppv_value", "ppv_pct", "spend"]),
+                pd.DataFrame(columns=["Supplier", "ppv_value", "ppv_pct", "spend"]))
+
+    # Row-level terms
+    d = d.copy()
+    d["ppv_val"] = (d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]
+    d["ppv_base"] = (d["Negotiated_Price"] * d["Quantity"])
+
+    # By Category (only the current filtered slice)
+    cat = d.groupby("Item_Category").agg(
+        ppv_value=("ppv_val", "sum"),
+        base=("ppv_base", "sum"),
+        spend=("Invoice_Amount", "sum")
+    ).reset_index()
+    cat["ppv_pct"] = np.where(cat["base"] > 0, cat["ppv_value"] / cat["base"] * 100.0, np.nan)
+    cat = cat.sort_values("ppv_value", ascending=False)
+
+    # By Supplier (only the current filtered slice)
+    sup = d.groupby("Supplier").agg(
+        ppv_value=("ppv_val", "sum"),
+        base=("ppv_base", "sum"),
+        spend=("Invoice_Amount", "sum")
+    ).reset_index()
+    sup["ppv_pct"] = np.where(sup["base"] > 0, sup["ppv_value"] / sup["base"] * 100.0, np.nan)
+    sup = sup.sort_values("ppv_value", ascending=False)
+
+    return cat, sup
+
+
+st.subheader("PPV (Selected Period) – by Category & Supplier")
+
+ppv_cat_sel, ppv_sup_sel = ppv_by_category_and_supplier(filtered)
+
+c_left, c_right = st.columns(2)
+
+with c_left:
+    st.caption("PPV by Category (filtered period)")
+    st.dataframe(
+        ppv_cat_sel[["Item_Category", "ppv_value", "ppv_pct", "spend"]]
+        .round({"ppv_value": 2, "ppv_pct": 2, "spend": 2}),
+        use_container_width=True
+    )
+    st.download_button(
+        "Download CSV (PPV by Category – selected period)",
+        data=ppv_cat_sel.to_csv(index=False),
+        file_name="ppv_by_category_selected_period.csv",
+        mime="text/csv"
+    )
+
+with c_right:
+    st.caption("PPV by Supplier (filtered period)")
+    st.dataframe(
+        ppv_sup_sel[["Supplier", "ppv_value", "ppv_pct", "spend"]]
+        .round({"ppv_value": 2, "ppv_pct": 2, "spend": 2}),
+        use_container_width=True
+    )
+    st.download_button(
+        "Download CSV (PPV by Supplier – selected period)",
+        data=ppv_sup_sel.to_csv(index=False),
+        file_name="ppv_by_supplier_selected_period.csv",
+        mime="text/csv"
+    )
 
 # ---------------------------
 # Definitions & Data freshness
