@@ -94,8 +94,6 @@ def apply_filters(df):
         mask &= df["is_maverick"]
     return df[mask].copy()
 
-if not apply:
-    st.info("Adjust filters, then click **Apply filters** to refresh KPIs and charts.")
 filtered = apply_filters(df) if apply else apply_filters(df)
 
 # ---------------------------
