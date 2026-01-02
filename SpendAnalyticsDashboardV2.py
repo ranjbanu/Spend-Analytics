@@ -116,8 +116,8 @@ def calc_kpis(d):
     # OTD
     kpis["otd_pct"] = float(d["is_ontime"].mean()*100.0) if len(d)>0 else None
     # PPV
-    ppv_val = ((d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]).sum()
-    ppv_base = (d["Negotiated_Price"] * d["Quantity"]).sum()
+    PPV_Value = ((d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]).sum()
+    PPV_Base = (d["Negotiated_Price"] * d["Quantity"]).sum()
     kpis["PPV_Value"] = float(PPV_Value)
     kpis["PPV_Pct"] = float(PPV_Value/PPV_Base*100.0) if PPV_Base>0 else None
     # Late payments
