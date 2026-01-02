@@ -283,36 +283,36 @@ def ppv_by_category_and_supplier(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
     Returns (ppv_cat_df, ppv_sup_df) both sorted by PPV value desc.
     """
     if d.empty:
-        return (pd.DataFrame(columns=["Item_Category", "ppv_value", "ppv_pct", "spend"]),
-                pd.DataFrame(columns=["Supplier", "ppv_value", "ppv_pct", "spend"]))
+        return (pd.DataFrame(columns=["Item_Category", "PPV_Value", "PPV_Pct", "spend"]),
+                pd.DataFrame(columns=["Supplier", "PPV_Value", "PPV_Pct", "spend"]))
 
     # Row-level terms
     d = d.copy()
-    d["ppv_val"] = (d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]
-    d["ppv_base"] = (d["Negotiated_Price"] * d["Quantity"])
+    d["PPV_Value"] = (d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]
+    d["PPV_Base"] = (d["Negotiated_Price"] * d["Quantity"])
 
     # By Category (only the current filtered slice)
     cat = d.groupby("Item_Category").agg(
-        ppv_value=("ppv_val", "sum"),
-        base=("ppv_base", "sum"),
+        ppv_value=("PPV_Value", "sum"),
+        base=("PPV_Base", "sum"),
         spend=("Invoice_Amount", "sum")
     ).reset_index()
-    cat["ppv_pct"] = np.where(cat["base"] > 0, cat["ppv_value"] / cat["base"] * 100.0, np.nan)
-    cat = cat.sort_values("ppv_value", ascending=False)
+    cat["PPV_Pct"] = np.where(cat["base"] > 0, cat["PPV_Value"] / cat["base"] * 100.0, np.nan)
+    cat = cat.sort_values("PPV_Value", ascending=False)
 
     # By Supplier (only the current filtered slice)
     sup = d.groupby("Supplier").agg(
-        ppv_value=("ppv_val", "sum"),
-        base=("ppv_base", "sum"),
+        ppv_value=("PPV_Value", "sum"),
+        base=("PPV_Base", "sum"),
         spend=("Invoice_Amount", "sum")
     ).reset_index()
-    sup["ppv_pct"] = np.where(sup["base"] > 0, sup["ppv_value"] / sup["base"] * 100.0, np.nan)
-    sup = sup.sort_values("ppv_value", ascending=False)
+    sup["PPV_Pct"] = np.where(sup["base"] > 0, sup["PPV_Value"] / sup["base"] * 100.0, np.nan)
+    sup = sup.sort_values("PPV_Value", ascending=False)
 
     return cat, sup
 
 
-st.subheader("PPV (Selected Period) – by Category & Supplier")
+st.subheader("Purchase Price Variance (PPV Selected Period) – by Category & Supplier")
 
 ppv_cat_sel, ppv_sup_sel = ppv_by_category_and_supplier(filtered)
 
@@ -321,8 +321,8 @@ c_left, c_right = st.columns(2)
 with c_left:
     st.caption("PPV by Category (filtered period)")
     st.dataframe(
-        ppv_cat_sel[["Item_Category", "ppv_value", "ppv_pct", "spend"]]
-        .round({"ppv_value": 2, "ppv_pct": 2, "spend": 2}),
+        ppv_cat_sel[["Item_Category", "PPV_Value", "PPV_Pct", "spend"]]
+        .round({"PPV_Value": 2, "PPV_Pct": 2, "spend": 2}),
         use_container_width=True
     )
     st.download_button(
@@ -335,8 +335,8 @@ with c_left:
 with c_right:
     st.caption("PPV by Supplier (filtered period)")
     st.dataframe(
-        ppv_sup_sel[["Supplier", "ppv_value", "ppv_pct", "spend"]]
-        .round({"ppv_value": 2, "ppv_pct": 2, "spend": 2}),
+        ppv_sup_sel[["Supplier", "PPV_Value", "PPV_Pct", "spend"]]
+        .round({"PPV_Value": 2, "PPV_Pct": 2, "spend": 2}),
         use_container_width=True
     )
     st.download_button(
