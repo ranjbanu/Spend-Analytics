@@ -118,8 +118,8 @@ def calc_kpis(d):
     # PPV
     ppv_val = ((d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]).sum()
     ppv_base = (d["Negotiated_Price"] * d["Quantity"]).sum()
-    kpis["ppv_value"] = float(ppv_val)
-    kpis["ppv_pct"] = float(ppv_val/ppv_base*100.0) if ppv_base>0 else None
+    kpis["PPV_Value"] = float(ppv_val)
+    kpis["PPV_Pct"] = float(ppv_val/ppv_base*100.0) if ppv_base>0 else None
     # Late payments
     late = d[d["is_late"]]
     kpis["late_count"] = int(len(late))
