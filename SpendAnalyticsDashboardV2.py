@@ -198,7 +198,7 @@ d1.metric("Spend (slice)", fmt_inr(dk["total_spend"]))
 d2.metric("OTD (slice)", pct(dk["otd_pct"]) if dk["otd_pct"] is not None else "—")
 d3.metric("PPV (slice)", pct(dk["PPV_Pct"]) if dk["PPV_Pct"] is not None else "—")
 
-st.dataframe(drill[[
+st.dataframe(filtered[[
     "PO_ID","Supplier","Invoice_Number","Invoice_Date","Invoice_Status","Item_Category","Spend_Category",
     "Quantity","Unit_Price","Negotiated_Price","Invoice_Amount","On_Time_Delivery","Maverick_Flag",
     "Invoice_Discrepancy_Reason","Payment_Date","Invoice_Due_Date"
