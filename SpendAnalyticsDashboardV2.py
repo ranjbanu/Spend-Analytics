@@ -9,8 +9,6 @@ from datetime import datetime, date, timedelta
 # Page & Theme
 # ---------------------------
 st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout="wide")
-st.caption("Executive overview of procurement spend, savings & risks")
-
 # ---------------------------
 # Utils: currency formatting
 # ---------------------------
@@ -137,7 +135,7 @@ k = calc_kpis(filtered)
 # Header
 # ---------------------------
 st.title("💸 Spend Analytics Dashboard")
-st.caption(f"Data coverage: {min_inv_date.date() if pd.notnull(min_inv_date) else '—'} → {max_inv_date.date() if pd.notnull(max_inv_date) else '—'}")
+st.caption(f"Executive overview of procurement spend, savings & risks: {min_inv_date.date() if pd.notnull(min_inv_date) else '—'} → {max_inv_date.date() if pd.notnull(max_inv_date) else '—'}")
 
 # ---------------------------
 # KPI row
@@ -148,7 +146,7 @@ c2.metric("Maverick Spend %", pct(k["maverick_pct"]) if k["maverick_pct"] is not
           help="Off-contract/off-approved spend ÷ addressable spend.")
 c3.metric("On-time Delivery", pct(k["otd_pct"]) if k["otd_pct"] is not None else "—",
           help="Percent of orders with On_Time_Delivery=='Yes'.")
-c4.metric("PPV (vs negotiated)", pct(k["ppv_pct"]) if k["ppv_pct"] is not None else "—",
+c4.metric("PPV (vs negotiated)", pct(k["PPV_Pct"]) if k["PPV_Pct"] is not None else "—",
           help="Σ(Unit−Negotiated)×Qty ÷ Σ(Negotiated×Qty).")
 c5.metric("Late Payments (₹)", fmt_inr(k["late_spend"]) + f" ({k['late_count']})",
           help="Payments after due date.")
@@ -215,7 +213,7 @@ dk = calc_kpis(drill)
 d1, d2, d3 = st.columns(3)
 d1.metric("Spend (slice)", fmt_inr(dk["total_spend"]))
 d2.metric("OTD (slice)", pct(dk["otd_pct"]) if dk["otd_pct"] is not None else "—")
-d3.metric("PPV (slice)", pct(dk["ppv_pct"]) if dk["ppv_pct"] is not None else "—")
+d3.metric("PPV (slice)", pct(dk["PPV_Pct"]) if dk["PPV_Pct"] is not None else "—")
 
 st.dataframe(drill[[
     "PO_ID","Supplier","Invoice_Number","Invoice_Date","Invoice_Status","Item_Category","Spend_Category",
