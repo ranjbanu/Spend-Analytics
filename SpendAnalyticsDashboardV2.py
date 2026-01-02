@@ -310,15 +310,12 @@ def ppv_by_category_and_supplier(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
     return cat, sup
 
 
-st.subheader("Purchase Price Variance (PPV Selected Period) – by Category & Supplier")
-
+st.subheader("Purchase Price Variance (PPV) – by Category & Supplier")
 
 # ---------------------------
 # Pie charts for PPV (Selected Period)
 # ---------------------------
 import plotly.express as px
-
-st.subheader("Pie Charts")
 
 ppv_cat_sel, ppv_sup_sel = ppv_by_category_and_supplier(filtered)
 # Prepare Category pie data (exclude zero/NaN PPV to avoid clutter)
@@ -327,7 +324,7 @@ cat_pie = cat_pie[(cat_pie["PPV_Value"].notna()) & (cat_pie["PPV_Value"] != 0)]
 cat_pie = cat_pie.sort_values("PPV_Value", ascending=False)
 
 # Prepare Supplier pie data (Top-N to keep the pie readable)
-TOP_N_SUPPLIERS = st.slider("Top-N suppliers for PPV pie", min_value=5, max_value=30, value=15, step=1)
+TOP_N_SUPPLIERS = st.slider("Top-N suppliers for PPV pie", min_value=1, max_value=5, value=3, step=1)
 sup_pie = ppv_sup_sel.copy()
 sup_pie = sup_pie[(sup_pie["PPV_Value"].notna()) & (sup_pie["PPV_Value"] != 0)]
 sup_pie = sup_pie.sort_values("PPV_Value", ascending=False).head(TOP_N_SUPPLIERS)
@@ -337,7 +334,7 @@ pie_left, pie_right = st.columns(2)
 
 # Pie 1: Category share of PPV value
 with pie_left:
-    st.caption("PPV value share by Item Category (selected period)")
+    st.caption("PPV value share by Item Category")
     if not cat_pie.empty:
         fig_cat = px.pie(
             cat_pie,
@@ -358,7 +355,7 @@ with pie_left:
 
 # Pie 2: Supplier share of PPV value (Top-N)
 with pie_right:
-    st.caption(f"PPV value share by Supplier (Top {TOP_N_SUPPLIERS}, selected period)")
+    st.caption(f"PPV value share by Supplier (Top {TOP_N_SUPPLIERS})")
     if not sup_pie.empty:
         fig_sup = px.pie(
             sup_pie,
@@ -380,14 +377,14 @@ with pie_right:
 c_left, c_right = st.columns(2)
 
 with c_left:
-    st.caption("PPV by Category (filtered period)")
+    st.caption("PPV by Category")
     st.dataframe(
         ppv_cat_sel[["Item_Category", "PPV_Value", "PPV_Pct", "spend"]]
         .round({"PPV_Value": 2, "PPV_Pct": 2, "spend": 2}),
         use_container_width=True
     )
     st.download_button(
-        "Download CSV (PPV by Category – selected period)",
+        "Download CSV (PPV by Category)",
         data=ppv_cat_sel.to_csv(index=False),
         file_name="ppv_by_category_selected_period.csv",
         mime="text/csv"
@@ -401,7 +398,7 @@ with c_right:
         use_container_width=True
     )
     st.download_button(
-        "Download CSV (PPV by Supplier – selected period)",
+        "Download CSV (PPV by Supplier)",
         data=ppv_sup_sel.to_csv(index=False),
         file_name="ppv_by_supplier_selected_period.csv",
         mime="text/csv"
