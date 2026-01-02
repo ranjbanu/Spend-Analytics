@@ -14,7 +14,7 @@ st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout=
 # ---------------------------
 def fmt_inr(x):
     try:
-        return f"₹{x:,.2f}"
+        return f"₹{x/10000000:,.2f}"
     except Exception:
         return "₹0"
 
@@ -157,7 +157,7 @@ kpi(c1, "Total Spend",f"{fmt_inr(k["total_spend"])}")
 kpi(c2, "Maverick Spend %",f"{pct(k["maverick_pct"]) if k["maverick_pct"] is not None else "—"}")
 kpi(c3, "On-time Delivery",f"{pct(k["otd_pct"]) if k["otd_pct"] is not None else "—"}")
 kpi(c4, "PPV (vs negotiated)",f"{pct(k["PPV_Pct"]) if k["PPV_Pct"] is not None else "—"}")
-kpi(c5, "Late Payments (₹)",f"{fmt_inr(k["late_spend"]) + fmt_inr(k['late_count'])}")
+kpi(c5, "Late Payments (₹)",f"{fmt_inr(k["late_spend"])}" + f"{fmt_inr(k['late_count'])}")
 #c1.metric("Total Spend", fmt_inr(k["total_spend"]))
 #c2.metric("Maverick Spend %", pct(k["maverick_pct"]) if k["maverick_pct"] is not None else "—",help="Off-contract/off-approved spend ÷ addressable spend.")
 #c3.metric("On-time Delivery", pct(k["otd_pct"]) if k["otd_pct"] is not None else "—",help="Percent of orders with On_Time_Delivery=='Yes'.")
