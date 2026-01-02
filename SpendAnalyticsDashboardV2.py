@@ -118,8 +118,8 @@ def calc_kpis(d):
     # PPV
     ppv_val = ((d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]).sum()
     ppv_base = (d["Negotiated_Price"] * d["Quantity"]).sum()
-    kpis["PPV_Value"] = float(ppv_val)
-    kpis["PPV_Pct"] = float(ppv_val/ppv_base*100.0) if ppv_base>0 else None
+    kpis["PPV_Value"] = float(PPV_Value)
+    kpis["PPV_Pct"] = float(PPV_Value/PPV_Base*100.0) if PPV_Base>0 else None
     # Late payments
     late = d[d["is_late"]]
     kpis["late_count"] = int(len(late))
@@ -293,7 +293,7 @@ def ppv_by_category_and_supplier(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
 
     # By Category (only the current filtered slice)
     cat = d.groupby("Item_Category").agg(
-        ppv_value=("PPV_Value", "sum"),
+        PPV_Value=("PPV_Value", "sum"),
         base=("PPV_Base", "sum"),
         spend=("Invoice_Amount", "sum")
     ).reset_index()
@@ -302,7 +302,7 @@ def ppv_by_category_and_supplier(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
 
     # By Supplier (only the current filtered slice)
     sup = d.groupby("Supplier").agg(
-        ppv_value=("PPV_Value", "sum"),
+        PPV_Value=("PPV_Value", "sum"),
         base=("PPV_Base", "sum"),
         spend=("Invoice_Amount", "sum")
     ).reset_index()
