@@ -14,7 +14,7 @@ st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout=
 # ---------------------------
 def fmt_inr(x):
     try:
-        return f"₹{x/10000000:,.2f} Cr"
+        return f"₹{x/1000000:,.2f} mn"
     except Exception:
         return "₹0"
 
