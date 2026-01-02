@@ -24,6 +24,20 @@ def pct(x):
     except Exception:
         return "–"
 
+def kpi(container, label, value):
+    container.markdown(
+        f"""
+        <div style="padding:10px;border-radius:8px;
+                    background-color:#2e2e2e;
+                    color: white; 
+                    text-align:center">
+            <h4>{label}</h4>
+            <h2>{value}</h2>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 # ---------------------------
 # Data loading & caching
 # ---------------------------
@@ -139,7 +153,11 @@ st.caption(f"Executive overview of procurement spend, savings & risks: {min_inv_
 # KPI row
 # ---------------------------
 c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Total Spend", fmt_inr(k["total_spend"]))
+kpi(c1,
+    "Actual Spend (₹ Cr)",
+    f"{fmt_inr(k["total_spend"]):,.2f}"
+)
+#c1.metric("Total Spend", fmt_inr(k["total_spend"]))
 c2.metric("Maverick Spend %", pct(k["maverick_pct"]) if k["maverick_pct"] is not None else "—",
           help="Off-contract/off-approved spend ÷ addressable spend.")
 c3.metric("On-time Delivery", pct(k["otd_pct"]) if k["otd_pct"] is not None else "—",
