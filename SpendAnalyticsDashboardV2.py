@@ -153,11 +153,11 @@ st.caption(f"Executive overview of procurement spend, savings & risks: {min_inv_
 # KPI row
 # ---------------------------
 c1, c2, c3, c4, c5 = st.columns(5)
-kpi(c1, "Total Spend",f"{fmt_inr(k["total_spend"])}")
+kpi(c1, "Total Spend (in Cr)",f"{fmt_inr(k["total_spend"])}")
 kpi(c2, "Maverick Spend %",f"{pct(k["maverick_pct"]) if k["maverick_pct"] is not None else "—"}")
 kpi(c3, "On-time Delivery",f"{pct(k["otd_pct"]) if k["otd_pct"] is not None else "—"}")
 kpi(c4, "PPV (vs negotiated)",f"{pct(k["PPV_Pct"]) if k["PPV_Pct"] is not None else "—"}")
-kpi(c5, "Late Payments (₹)",f"{fmt_inr(k["late_spend"])}" + f"{fmt_inr(k['late_count'])}")
+kpi(c5, "Late Payments (in Cr)",f"{fmt_inr(k["late_spend"])}")
 #c1.metric("Total Spend", fmt_inr(k["total_spend"]))
 #c2.metric("Maverick Spend %", pct(k["maverick_pct"]) if k["maverick_pct"] is not None else "—",help="Off-contract/off-approved spend ÷ addressable spend.")
 #c3.metric("On-time Delivery", pct(k["otd_pct"]) if k["otd_pct"] is not None else "—",help="Percent of orders with On_Time_Delivery=='Yes'.")
