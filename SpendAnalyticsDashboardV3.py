@@ -569,7 +569,7 @@ with sv_tab:
 
     # Comparison charts: Category
     st.subheader("Savings Comparison by Category")
-    TOP_N_CAT = st.slider("Top-N categories", min_value=5, max_value=30, value=15, step=1)
+    TOP_N_CAT = st.slider("Top-N categories", min_value=2, max_value=5, value=2, step=1)
 
     cr_cat_curr = current["CR_by_cat"].head(TOP_N_CAT).copy(); cr_cat_curr["Period"] = "Current"
     if compare_prev and previous is not None:
@@ -612,7 +612,7 @@ with sv_tab:
 
     # Comparison charts: Supplier
     st.subheader("Savings Comparison by Supplier")
-    TOP_N_SUP = st.slider("Top-N suppliers", min_value=5, max_value=30, value=15, step=1)
+    TOP_N_SUP = st.slider("Top-N suppliers", min_value=2, max_value=5, value=2, step=1)
 
     cr_sup_curr = current["CR_by_sup"].head(TOP_N_SUP).copy(); cr_sup_curr["Period"] = "Current"
     if compare_prev and previous is not None:
