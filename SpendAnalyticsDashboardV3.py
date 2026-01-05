@@ -43,7 +43,7 @@ def kpi(container, label, value):
 # ---------------------------
 @st.cache_data(ttl=900)
 def load_data():
-    df = pd.read_csv("Procurement_KPI_Analysis_with_Invoices_projected.csv")
+    df = pd.read_csv("Procurement_KPI_Analysis_with_Invoices_Projected_NegotiatedPrice.csv")
     df.columns = [c.strip() for c in df.columns]
     # Parse dates (day-first)
     for col in ['Order_Date','Delivery_Date','Price_Effective_Date','Contract_Start_Date',
