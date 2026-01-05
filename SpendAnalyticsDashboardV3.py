@@ -477,13 +477,24 @@ with sv_tab:
                 "monthly_dpo": pd.DataFrame(columns=["month","weighted_dpo"]) }
 
         # Savings
+        
         d["cr_value"] = np.where(
-            (d["Unit_Price"].notna()) & (d["Negotiated_Price"].notna()) & (d["Unit_Price"] < d["Negotiated_Price"]),
-            (d["Negotiated_Price"] - d["Unit_Price"]) * d["Quantity"], 0.0)
+            d["Unit_Price"].notna() & d["Negotiated_Price"].notna() &
+            (d["Unit_Price"] < d["Negotiated_Price"]) &
+            d["Quantity"].notna() & (d["Quantity"] > 0),
+            (d["Negotiated_Price"] - d["Unit_Price"]) * d["Quantity"],
+            0.0
+        )
+        
         d["ca_value"] = np.where(
-            (d["Projected_Price"].notna()) & (d["Negotiated_Price"].notna()) &
-            (d["Projected_Price"] > d["Negotiated_Price"]) & (d["Unit_Price"].notna()) & (d["Unit_Price"] <= d["Negotiated_Price"]),
-            (d["Projected_Price"] - d["Negotiated_Price"]) * d["Quantity"], 0.0)
+            d["Projected_Price"].notna() & d["Negotiated_Price"].notna() &
+            (d["Projected_Price"] > d["Negotiated_Price"]) &
+            d["Unit_Price"].notna() & (d["Unit_Price"] <= d["Negotiated_Price"]) &
+            d["Quantity"].notna() & (d["Quantity"] > 0),
+            (d["Projected_Price"] - d["Negotiated_Price"]) * d["Quantity"],
+            0.0
+        )
+
 
         # Working capital
         d["terms_days"] = d.apply(lambda r: _terms_to_days(r.get("Payment_Terms"), r.get("Invoice_Date"), r.get("Invoice_Due_Date")), axis=1)
