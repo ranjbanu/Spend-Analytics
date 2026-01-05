@@ -546,6 +546,8 @@ with sv_tab:
     # Current slice
     current_df = _apply_filters_for_period(base_df, start_d, end_d)
     current = _compute_metrics(current_df, start_d, end_d)
+    st.download_button("Download (Current, CSV)", data=current.to_csv(index=False), file_name="dpo_detail_current.csv", mime="text/csv")
+
 
     # Previous slice
     previous = None
