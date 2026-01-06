@@ -515,7 +515,7 @@ with sv_tab:
             d["Unit_Price"].notna() & d["Negotiated_Price"].notna() &
             (d["Unit_Price"] < d["Negotiated_Price"]) &
             d["Quantity"].notna() & (d["Quantity"] > 0),
-            (d["Negotiated_Price"] - d["Unit_Price"]) * d["Quantity"],
+            round((d["Negotiated_Price"] - d["Unit_Price"]) * d["Quantity"],2),
             0.0
         )
         
@@ -524,7 +524,7 @@ with sv_tab:
             (d["Projected_Price"] > d["Negotiated_Price"]) &
             d["Unit_Price"].notna() & (d["Unit_Price"] <= d["Negotiated_Price"]) &
             d["Quantity"].notna() & (d["Quantity"] > 0),
-            (d["Projected_Price"] - d["Negotiated_Price"]) * d["Quantity"],
+            round((d["Projected_Price"] - d["Negotiated_Price"]) * d["Quantity"],2),
             0.0
         )
 
