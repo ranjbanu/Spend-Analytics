@@ -341,11 +341,6 @@ import plotly.express as px
 # =============================================================
 st.subheader("Purchase Price Variance (PPV) – by Category & Supplier")
 
-# --- Toggle: use negotiated price or original ---
-use_enriched_for_ppv = st.checkbox(
-    "Use negotiated price for PPV",
-    value=("Negotiated_Price" in filtered.columns)
-)
 data_for_ppv = filtered.copy()
 # Compute PPV terms with tolerance to avoid cosmetic noise
 TOL_PCT = 0.001  # 0.1% tolerance
@@ -380,7 +375,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Pies need non-negative values; use absolute PPV_Value and annotate sign in tooltip
-TOP_N_SUPPLIERS = st.slider("Top‑N suppliers for PPV pie", min_value=1, max_value=10, value=5, step=1)
+TOP_N_SUPPLIERS = st.slider("Top‑N suppliers for PPV pie", min_value=1, max_value=5, value=2, step=1)
 
 # Category pie (absolute values + sign in hover)
 cat_pie = ppv_cat.copy()
@@ -449,22 +444,6 @@ with c_right:
         mime="text/csv"
     )
 
-# Diagnostics: why PPV is negative (counts + sample)
-with st.expander("PPV Diagnostics"):
-    d_diag = data_for_ppv.copy()
-    d_diag["diff_vs_neg"] = d_diag["Unit_Price"] - d_diag["Negotiated_Price"]
-    st.write({
-        "rows_total": len(d_diag),
-        "rows_unit_below_negotiated": int((d_diag["diff_vs_neg"] < 0).sum()),
-        "rows_unit_equal_negotiated": int((d_diag["diff_vs_neg"] == 0).sum()),
-        "rows_unit_above_negotiated": int((d_diag["diff_vs_neg"] > 0).sum())
-    })
-    cols_show = ["Supplier","Item_Category","Unit_Price","Negotiated_Price","Quantity","PPV_Value","PPV_Base"]
-    st.dataframe(d_diag.loc[d_diag["diff_vs_neg"] < 0, cols_show].sort_values("PPV_Value").head(30))
-
-# Example to make tolerance tunable:
-TOL_PCT = st.slider("PPV tolerance (rounding band)", 0.0, 0.005, 0.001, 0.0005)
-data_for_ppv = compute_ppv_terms(data_for_ppv, tol_pct=TOL_PCT)
 
 # =============================================================
 # 💰 Savings & Working Capital (separate tab with Compare toggle)
@@ -576,8 +555,8 @@ with sv_tab:
         monthly_dpo = d.groupby("month").apply(wavg_group).rename("weighted_dpo").reset_index()
     
         return {
-            "CR": float(d["cr_value"].sum()),
-            "CA": float(d["ca_value"].sum()),
+            "CR": round(float(d["cr_value"].sum()),2),
+            "CA": round(float(d["ca_value"].sum()),2),
             "DPO_actual": wa_dpo_actual, "DPO_target": wa_dpo_target,
             "AP_float": float(ap_float), "spend": spend_selected,
             "days": days_in_period, "spend_per_day": float(spend_per_day),
