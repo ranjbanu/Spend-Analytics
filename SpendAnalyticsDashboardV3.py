@@ -346,7 +346,7 @@ use_enriched_for_ppv = st.checkbox(
     "Use negotiated price for PPV",
     value=("Negotiated_Price" in filtered.columns)
 )
-
+data_for_ppv = filtered.copy()
 # Compute PPV terms with tolerance to avoid cosmetic noise
 TOL_PCT = 0.001  # 0.1% tolerance
 data_for_ppv = compute_ppv_terms(data_for_ppv, tol_pct=TOL_PCT)
