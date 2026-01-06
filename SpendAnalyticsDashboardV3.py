@@ -67,7 +67,6 @@ def ppv_favorable_unfavorable(d: pd.DataFrame) -> tuple[float, float, float]:
     unf = float(d.loc[d["PPV_Value"] > 0, "PPV_Value"].sum())
     net = float(d["PPV_Value"].sum())
     return fav, unf, net
-``
 
 # ---------------------------
 # Data loading & caching
