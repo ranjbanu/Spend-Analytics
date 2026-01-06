@@ -38,6 +38,37 @@ def kpi(container, label, value):
         unsafe_allow_html=True
     )
 
+# ---------- PPV Enhancements (helpers) ----------
+
+def compute_ppv_terms(d: pd.DataFrame, tol_pct: float = 0.001) -> pd.DataFrame:
+    """
+    Compute PPV terms with a small tolerance:
+    - PPV_Base = Negotiated_Price * Quantity
+    - PPV_Value = (Unit_Price - Negotiated_Price) * Quantity, but set to 0
+      when price difference is within tol_pct of negotiated (to avoid rounding noise).
+    """
+    d = d.copy()
+    d["PPV_Base"] = d["Negotiated_Price"] * d["Quantity"]
+    raw_ppv = (d["Unit_Price"] - d["Negotiated_Price"]) * d["Quantity"]
+
+    small_diff = (
+        d["Unit_Price"].notna() & d["Negotiated_Price"].notna() &
+        (np.abs(d["Unit_Price"] - d["Negotiated_Price"]) <= d["Negotiated_Price"].abs() * tol_pct)
+    )
+    d["PPV_Value"] = np.where(small_diff, 0.0, raw_ppv)
+    return d
+
+def ppv_favorable_unfavorable(d: pd.DataFrame) -> tuple[float, float, float]:
+    """
+    Return (favorable_sum, unfavorable_sum, net_sum) in currency terms.
+    Favorable rows have PPV_Value < 0, unfavorable > 0.
+    """
+    fav = float(d.loc[d["PPV_Value"] < 0, "PPV_Value"].sum())
+    unf = float(d.loc[d["PPV_Value"] > 0, "PPV_Value"].sum())
+    net = float(d["PPV_Value"].sum())
+    return fav, unf, net
+``
+
 # ---------------------------
 # Data loading & caching
 # ---------------------------
@@ -309,108 +340,141 @@ st.subheader("Purchase Price Variance (PPV) – by Category & Supplier")
 # ---------------------------
 import plotly.express as px
 
-ppv_cat_sel, ppv_sup_sel = ppv_by_category_and_supplier(filtered)
-# Prepare Category pie data (exclude zero/NaN PPV to avoid clutter)
-cat_pie = ppv_cat_sel.copy()
-cat_pie = cat_pie[(cat_pie["PPV_Value"].notna()) & (cat_pie["PPV_Value"] != 0)]
-cat_pie = cat_pie.sort_values("PPV_Value", ascending=False)
+# =============================================================
+# Purchase Price Variance (PPV) – by Category & Supplier (Enhanced)
+# =============================================================
+st.subheader("Purchase Price Variance (PPV) – by Category & Supplier")
 
-# Prepare Supplier pie data (Top-N to keep the pie readable)
-TOP_N_SUPPLIERS = st.slider("Top-N suppliers for PPV pie", min_value=1, max_value=5, value=3, step=1)
-sup_pie = ppv_sup_sel.copy()
-sup_pie = sup_pie[(sup_pie["PPV_Value"].notna()) & (sup_pie["PPV_Value"] != 0)]
-sup_pie = sup_pie.sort_values("PPV_Value", ascending=False).head(TOP_N_SUPPLIERS)
+# --- Toggle: use enriched negotiated price or original ---
+use_enriched_for_ppv = st.checkbox(
+    "Use enriched negotiated price for PPV (if available)",
+    value=("Negotiated_Price_Enriched" in filtered.columns),
+    help="When checked, PPV is computed against Negotiated_Price_Enriched; otherwise, original Negotiated_Price."
+)
 
-# Layout columns
+# Prepare data for PPV calculations
+data_for_ppv = filtered.copy()
+if use_enriched_for_ppv and "Negotiated_Price_Enriched" in data_for_ppv.columns:
+    data_for_ppv["Negotiated_Price"] = data_for_ppv["Negotiated_Price_Enriched"]
+
+# Compute PPV terms with tolerance to avoid cosmetic noise
+TOL_PCT = 0.001  # 0.1% tolerance
+data_for_ppv = compute_ppv_terms(data_for_ppv, tol_pct=TOL_PCT)
+
+# Aggregate PPV by Category & Supplier
+ppv_cat = (data_for_ppv.groupby("Item_Category", dropna=False)
+           .agg(PPV_Value=("PPV_Value","sum"),
+                base=("PPV_Base","sum"),
+                spend=("Invoice_Amount","sum"))
+           .reset_index())
+ppv_cat["PPV_Pct"] = np.where(ppv_cat["base"].abs()>1e-9, ppv_cat["PPV_Value"]/ppv_cat["base"]*100.0, np.nan)
+ppv_cat = ppv_cat.sort_values("PPV_Value", ascending=True)  # show favorable first (more negative)
+
+ppv_sup = (data_for_ppv.groupby("Supplier", dropna=False)
+           .agg(PPV_Value=("PPV_Value","sum"),
+                base=("PPV_Base","sum"),
+                spend=("Invoice_Amount","sum"))
+           .reset_index())
+ppv_sup["PPV_Pct"] = np.where(ppv_sup["base"].abs()>1e-9, ppv_sup["PPV_Value"]/ppv_sup["base"]*100.0, np.nan)
+ppv_sup = ppv_sup.sort_values("PPV_Value", ascending=True)
+
+# KPI tiles: Favorable vs Unfavorable vs Net
+fav_val, unf_val, net_val = ppv_favorable_unfavorable(data_for_ppv)
+c1, c2, c3 = st.columns(3)
+c1.metric("Favorable PPV (₹)", fmt_inr(abs(fav_val)), help="Total savings vs negotiated (PPV < 0)")
+c2.metric("Unfavorable PPV (₹)", fmt_inr(unf_val), help="Total paid above negotiated (PPV > 0)")
+c3.metric("Net PPV (₹)", fmt_inr(net_val), help="Favorable + Unfavorable")
+
+# --- Visuals: pies & bars ---
+import plotly.express as px
+import plotly.graph_objects as go
+
+# Pies need non-negative values; use absolute PPV_Value and annotate sign in tooltip
+TOP_N_SUPPLIERS = st.slider("Top‑N suppliers for PPV pie", min_value=1, max_value=10, value=5, step=1)
+
+# Category pie (absolute values + sign in hover)
+cat_pie = ppv_cat.copy()
+cat_pie["PPV_Abs"] = cat_pie["PPV_Value"].abs()
+cat_pie["Sign"] = np.where(cat_pie["PPV_Value"] < 0, "Favorable", "Unfavorable")
+cat_pie = cat_pie[cat_pie["PPV_Abs"] > 0].sort_values("PPV_Abs", ascending=False)
+
+# Supplier pie (Top-N absolute contributors)
+sup_pie = ppv_sup.copy()
+sup_pie["PPV_Abs"] = sup_pie["PPV_Value"].abs()
+sup_pie["Sign"] = np.where(sup_pie["PPV_Value"] < 0, "Favorable", "Unfavorable")
+sup_pie = sup_pie[sup_pie["PPV_Abs"] > 0].sort_values("PPV_Abs", ascending=False).head(TOP_N_SUPPLIERS)
+
 pie_left, pie_right = st.columns(2)
-
-# Pie 1: Category share of PPV value
 with pie_left:
-    st.caption("PPV value share by Item Category")
+    st.caption("PPV value share by Item Category (absolute, sign in tooltip)")
     if not cat_pie.empty:
         fig_cat = px.pie(
-            cat_pie,
-            names="Item_Category",
-            values="PPV_Value",
-            hole=0.35,
-            title="PPV by Category",
+            cat_pie, names="Item_Category", values="PPV_Abs", hole=0.35, title="PPV by Category"
         )
-        # Rich tooltips
         fig_cat.update_traces(
-            hovertemplate="<b>%{label}</b><br>PPV ₹%{value:,.0f}<br>PPV% %{customdata:.2f}%",
-            customdata=cat_pie["PPV_Pct"]
+            hovertemplate="**%{label}**<br>PPV ₹%{value:,.0f}<br>Sign: %{customdata}<extra></extra>",
+            customdata=cat_pie["Sign"]
         )
-        fig_cat.update_layout(legend_title_text="Category")
         st.plotly_chart(fig_cat, use_container_width=True)
     else:
         st.info("No PPV data available for the selected period & filters.")
-
-# Pie 2: Supplier share of PPV value (Top-N)
 with pie_right:
-    st.caption(f"PPV value share by Supplier (Top {TOP_N_SUPPLIERS})")
+    st.caption(f"PPV value share by Supplier (Top {TOP_N_SUPPLIERS}, absolute, sign in tooltip)")
     if not sup_pie.empty:
         fig_sup = px.pie(
-            sup_pie,
-            names="Supplier",
-            values="PPV_Value",
-            hole=0.35,
-            title=f"PPV by Supplier (Top {TOP_N_SUPPLIERS})",
+            sup_pie, names="Supplier", values="PPV_Abs", hole=0.35, title=f"PPV by Supplier (Top {TOP_N_SUPPLIERS})"
         )
         fig_sup.update_traces(
-            hovertemplate="<b>%{label}</b><br>PPV ₹%{value:,.0f}<br>PPV% %{customdata:.2f}%",
-            customdata=sup_pie["PPV_Pct"]
+            hovertemplate="**%{label}**<br>PPV ₹%{value:,.0f}<br>Sign: %{customdata}<extra></extra>",
+            customdata=sup_pie["Sign"]
         )
-        fig_sup.update_layout(legend_title_text="Supplier")
         st.plotly_chart(fig_sup, use_container_width=True)
     else:
         st.info("No PPV data available for the selected period & filters.")
 
-
+# Tables (sign-aware, negative = favorable)
 c_left, c_right = st.columns(2)
-
 with c_left:
-    st.caption("PPV by Category")
+    st.caption("PPV by Category (negative = favorable)")
     st.dataframe(
-        ppv_cat_sel[["Item_Category", "PPV_Value", "PPV_Pct", "spend"]]
-        .round({"PPV_Value": 2, "PPV_Pct": 2, "spend": 2}),
+        ppv_cat[["Item_Category", "PPV_Value", "PPV_Pct", "spend"]].round(2),
         use_container_width=True
     )
     st.download_button(
         "Download CSV (PPV by Category)",
-        data=ppv_cat_sel.to_csv(index=False),
-        file_name="ppv_by_category_selected_period.csv",
+        data=ppv_cat.to_csv(index=False),
+        file_name="ppv_by_category.csv",
         mime="text/csv"
     )
-
 with c_right:
-    st.caption("PPV by Supplier (filtered period)")
+    st.caption("PPV by Supplier (negative = favorable)")
     st.dataframe(
-        ppv_sup_sel[["Supplier", "PPV_Value", "PPV_Pct", "spend"]]
-        .round({"PPV_Value": 2, "PPV_Pct": 2, "spend": 2}),
+        ppv_sup[["Supplier", "PPV_Value", "PPV_Pct", "spend"]].round(2),
         use_container_width=True
     )
     st.download_button(
         "Download CSV (PPV by Supplier)",
-        data=ppv_sup_sel.to_csv(index=False),
-        file_name="ppv_by_supplier_selected_period.csv",
+        data=ppv_sup.to_csv(index=False),
+        file_name="ppv_by_supplier.csv",
         mime="text/csv"
     )
 
-# ---------------------------
-# Definitions & Data freshness
-# ---------------------------
-with st.expander("Definitions & Data Freshness"):
-    st.markdown(f"""
-**Data last loaded:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
-- **Total Spend:** Sum of `Invoice_Amount` in the filtered slice.
-- **Maverick Spend %:** Sum of `Invoice_Amount` where `Maverick_Flag=='Yes'` ÷ sum of `Invoice_Amount` where `Approved_Category_Flag=='Yes'`.
-- **OTD %:** Share of rows with `On_Time_Delivery=='Yes'`.
-- **PPV %:** Σ(Unit−Negotiated)×Qty ÷ Σ(Negotiated×Qty) over filtered rows.
-- **Late Payments:** `Payment_Date > Invoice_Due_Date`.
-    """)
+# Diagnostics: why PPV is negative (counts + sample)
+with st.expander("PPV Diagnostics"):
+    d_diag = data_for_ppv.copy()
+    d_diag["diff_vs_neg"] = d_diag["Unit_Price"] - d_diag["Negotiated_Price"]
+    st.write({
+        "rows_total": len(d_diag),
+        "rows_unit_below_negotiated": int((d_diag["diff_vs_neg"] < 0).sum()),
+        "rows_unit_equal_negotiated": int((d_diag["diff_vs_neg"] == 0).sum()),
+        "rows_unit_above_negotiated": int((d_diag["diff_vs_neg"] > 0).sum())
+    })
+    cols_show = ["Supplier","Item_Category","Unit_Price","Negotiated_Price","Negotiated_Price_Enriched","Quantity","PPV_Value","PPV_Base"]
+    st.dataframe(d_diag.loc[d_diag["diff_vs_neg"] < 0, cols_show].sort_values("PPV_Value").head(30))
 
-
-
+# Example to make tolerance tunable:
+TOL_PCT = st.slider("PPV tolerance (rounding band)", 0.0, 0.005, 0.001, 0.0005)
+data_for_ppv = compute_ppv_terms(data_for_ppv, tol_pct=TOL_PCT)
 
 # =============================================================
 # 💰 Savings & Working Capital (separate tab with Compare toggle)
