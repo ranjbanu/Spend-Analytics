@@ -520,6 +520,7 @@ with sv_tab:
         def wavg_group(g):
             return weighted_avg(g["dpo_actual"], g["Invoice_Amount"]) 
         monthly_dpo = d.groupby("month").apply(wavg_group).rename("weighted_dpo").reset_index()
+        st.download_button("Download (Current, CSV)", data=d.to_csv(index=False), file_name="current.csv", mime="text/csv")
 
         return {
             "CR": float(d["cr_value"].sum()),
@@ -546,8 +547,7 @@ with sv_tab:
     # Current slice
     current_df = _apply_filters_for_period(base_df, start_d, end_d)
     current = _compute_metrics(current_df, start_d, end_d)
-    st.download_button("Download (Current, CSV)", data=pd.DataFrame([current])[["CA", "CR"]].to_csv(index=False), file_name="current.csv", mime="text/csv")
-
+    
 
     # Previous slice
     previous = None
