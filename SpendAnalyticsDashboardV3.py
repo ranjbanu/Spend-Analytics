@@ -332,9 +332,6 @@ def ppv_by_category_and_supplier(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
 
     return cat, sup
 
-
-st.subheader("Purchase Price Variance (PPV) – by Category & Supplier")
-
 # ---------------------------
 # Pie charts for PPV (Selected Period)
 # ---------------------------
@@ -345,17 +342,11 @@ import plotly.express as px
 # =============================================================
 st.subheader("Purchase Price Variance (PPV) – by Category & Supplier")
 
-# --- Toggle: use enriched negotiated price or original ---
+# --- Toggle: use negotiated price or original ---
 use_enriched_for_ppv = st.checkbox(
-    "Use enriched negotiated price for PPV (if available)",
-    value=("Negotiated_Price_Enriched" in filtered.columns),
-    help="When checked, PPV is computed against Negotiated_Price_Enriched; otherwise, original Negotiated_Price."
+    "Use negotiated price for PPV",
+    value=("Negotiated_Price" in filtered.columns)
 )
-
-# Prepare data for PPV calculations
-data_for_ppv = filtered.copy()
-if use_enriched_for_ppv and "Negotiated_Price_Enriched" in data_for_ppv.columns:
-    data_for_ppv["Negotiated_Price"] = data_for_ppv["Negotiated_Price_Enriched"]
 
 # Compute PPV terms with tolerance to avoid cosmetic noise
 TOL_PCT = 0.001  # 0.1% tolerance
@@ -469,7 +460,7 @@ with st.expander("PPV Diagnostics"):
         "rows_unit_equal_negotiated": int((d_diag["diff_vs_neg"] == 0).sum()),
         "rows_unit_above_negotiated": int((d_diag["diff_vs_neg"] > 0).sum())
     })
-    cols_show = ["Supplier","Item_Category","Unit_Price","Negotiated_Price","Negotiated_Price_Enriched","Quantity","PPV_Value","PPV_Base"]
+    cols_show = ["Supplier","Item_Category","Unit_Price","Negotiated_Price","Quantity","PPV_Value","PPV_Base"]
     st.dataframe(d_diag.loc[d_diag["diff_vs_neg"] < 0, cols_show].sort_values("PPV_Value").head(30))
 
 # Example to make tolerance tunable:
