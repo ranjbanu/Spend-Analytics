@@ -520,7 +520,7 @@ with sv_tab:
         def wavg_group(g):
             return weighted_avg(g["dpo_actual"], g["Invoice_Amount"]) 
         monthly_dpo = d.groupby("month").apply(wavg_group).rename("weighted_dpo").reset_index()
-        data=d.to_csv('current.csv',index=False,sep=';')
+        data=d.to_csv('C:\Users\ranrajam\current.csv',index=False,sep=';')
 
         return {
             "CR": float(d["cr_value"].sum()),
