@@ -609,7 +609,7 @@ with sv_tab:
 
     st.divider()
 
-    cr_cat_curr = current["CR_by_cat"].head(TOP_N_CAT).copy(); cr_cat_curr["Period"] = "Current"
+    cr_cat_curr = current["CR_by_cat"].copy(); cr_cat_curr["Period"] = "Current"
     if compare_prev and previous is not None:
         cr_cat_prev = previous["CR_by_cat"].copy()
         top_cats = cr_cat_curr["Item_Category"].tolist()
