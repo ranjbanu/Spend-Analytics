@@ -650,15 +650,17 @@ with sv_tab:
          previous["CA_by_cat"].assign(Source="Previous")],
         ignore_index=True
         )
-        
-    if compare_prev and previous is not None:
-        st.download_button("Download CR by Category (Previous, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
-    else:
-        st.download_button("Download CR by Category (Current, CSV)", data=current["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_current.csv", mime="text/csv")
-    if compare_prev and previous is not None:
-        st.download_button("Download CA by Category (Previous, CSV)", data=combined_CA_df.to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
-    else:
-        st.download_button("Download CA by Category (Current, CSV)", data=current["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_current.csv", mime="text/csv")
+    c_left, c_right = st.columns(2)
+    with c_left:      
+        if compare_prev and previous is not None:
+            st.download_button("Download CR by Category (Previous, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
+        else:
+            st.download_button("Download CR by Category (Current, CSV)", data=current["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_current.csv", mime="text/csv")
+    with c_right:
+        if compare_prev and previous is not None:
+            st.download_button("Download CA by Category (Previous, CSV)", data=combined_CA_df.to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
+        else:
+            st.download_button("Download CA by Category (Current, CSV)", data=current["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_current.csv", mime="text/csv")
     st.divider()
 
     cr_sup_curr = current["CR_by_sup"].copy(); cr_sup_curr["Period"] = "Current"
@@ -700,15 +702,17 @@ with sv_tab:
          previous["CA_by_sup"].assign(Source="Previous")],
         ignore_index=True
         )
-
-    if compare_prev and previous is not None:
-        st.download_button("Download CR by Supplier (Previous, CSV)", data=combined_CR_sup_df.to_csv(index=False), file_name="cr_by_supplier_previous.csv", mime="text/csv")
-    else:
-        st.download_button("Download CR by Supplier (Current, CSV)", data=current["CR_by_sup"].to_csv(index=False), file_name="cr_by_supplier_current.csv", mime="text/csv")
-    if compare_prev and previous is not None:
-        st.download_button("Download CA by Supplier (Previous, CSV)", data=combined_CA_sup_df.to_csv(index=False), file_name="ca_by_supplier_previous.csv", mime="text/csv")
-    else:
-        st.download_button("Download CA by Supplier (Current, CSV)", data=current["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_current.csv", mime="text/csv")
+    c_left, c_right = st.columns(2)
+    with c_left:   
+        if compare_prev and previous is not None:
+            st.download_button("Download CR by Supplier (Previous, CSV)", data=combined_CR_sup_df.to_csv(index=False), file_name="cr_by_supplier_previous.csv", mime="text/csv")
+        else:
+            st.download_button("Download CR by Supplier (Current, CSV)", data=current["CR_by_sup"].to_csv(index=False), file_name="cr_by_supplier_current.csv", mime="text/csv")
+    with c_right:
+        if compare_prev and previous is not None:
+            st.download_button("Download CA by Supplier (Previous, CSV)", data=combined_CA_sup_df.to_csv(index=False), file_name="ca_by_supplier_previous.csv", mime="text/csv")
+        else:
+            st.download_button("Download CA by Supplier (Current, CSV)", data=current["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_current.csv", mime="text/csv")
     st.divider()
 
     # Working Capital: Monthly DPO
