@@ -638,14 +638,27 @@ with sv_tab:
         fig2 = px.bar(ca_cat_plot, x="Item_Category", y="CA_Value", color="Period", barmode="group", text="CA_Value")
         fig2.update_layout(yaxis_title="CA (₹)", xaxis_title="")
         st.plotly_chart(fig2, use_container_width=True)
-
-    st.download_button("Download CR by Category (Current, CSV)", data=current["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_current.csv", mime="text/csv")
+    
     if compare_prev and previous is not None:
-        st.download_button("Download CR by Category (Previous, CSV)", data=previous["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
-    st.download_button("Download CA by Category (Current, CSV)", data=current["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_current.csv", mime="text/csv")
+        combined_CR_df = pd.concat(
+            [current["CR_by_cat"].assign(Source="Current"),
+             previous["CR_by_cat"].assign(Source="Previous")],
+            ignore_index=True
+        )
+        combined_CA_df = pd.concat(
+        [current["CA_by_cat"].assign(Source="Current"),
+         previous["CA_by_cat"].assign(Source="Previous")],
+        ignore_index=True
+    )
+        
     if compare_prev and previous is not None:
-        st.download_button("Download CA by Category (Previous, CSV)", data=previous["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
-
+        st.download_button("Download CR by Category (Previous, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
+    else:
+        st.download_button("Download CR by Category (Current, CSV)", data=current["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_current.csv", mime="text/csv")
+    if compare_prev and previous is not None:
+        st.download_button("Download CA by Category (Previous, CSV)", data=combined_CA_df.to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
+    else:
+        st.download_button("Download CA by Category (Current, CSV)", data=current["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_current.csv", mime="text/csv")
     st.divider()
 
     cr_sup_curr = current["CR_by_sup"].copy(); cr_sup_curr["Period"] = "Current"
@@ -676,13 +689,26 @@ with sv_tab:
         fig4.update_layout(yaxis_title="CA (₹)", xaxis_title="")
         st.plotly_chart(fig4, use_container_width=True)
 
-    st.download_button("Download CR by Supplier (Current, CSV)", data=current["CR_by_sup"].to_csv(index=False), file_name="cr_by_supplier_current.csv", mime="text/csv")
     if compare_prev and previous is not None:
-        st.download_button("Download CR by Supplier (Previous, CSV)", data=previous["CR_by_sup"].to_csv(index=False), file_name="cr_by_supplier_previous.csv", mime="text/csv")
-    st.download_button("Download CA by Supplier (Current, CSV)", data=current["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_current.csv", mime="text/csv")
-    if compare_prev and previous is not None:
-        st.download_button("Download CA by Supplier (Previous, CSV)", data=previous["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_previous.csv", mime="text/csv")
+    combined_CR_sup_df = pd.concat(
+        [current["CR_by_sup"].assign(Source="Current"),
+         previous["CR_by_sup"].assign(Source="Previous")],
+        ignore_index=True
+    )
+    combined_CA_sup_df = pd.concat(
+    [current["CA_by_sup"].assign(Source="Current"),
+     previous["CA_by_sup"].assign(Source="Previous")],
+    ignore_index=True
+    )
 
+    if compare_prev and previous is not None:
+        st.download_button("Download CR by Supplier (Previous, CSV)", data=combined_CR_sup_df.to_csv(index=False), file_name="cr_by_supplier_previous.csv", mime="text/csv")
+    else:
+        st.download_button("Download CR by Supplier (Current, CSV)", data=current["CR_by_sup"].to_csv(index=False), file_name="cr_by_supplier_current.csv", mime="text/csv")
+    if compare_prev and previous is not None:
+        st.download_button("Download CA by Supplier (Previous, CSV)", data=combined_CA_sup_df.to_csv(index=False), file_name="ca_by_supplier_previous.csv", mime="text/csv")
+    else:
+        st.download_button("Download CA by Supplier (Current, CSV)", data=current["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_current.csv", mime="text/csv")
     st.divider()
 
     # Working Capital: Monthly DPO
