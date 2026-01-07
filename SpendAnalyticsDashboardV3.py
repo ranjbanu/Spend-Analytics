@@ -374,9 +374,6 @@ c3.metric("Net PPV (₹)", fmt_inr(net_val), help="Favorable + Unfavorable")
 import plotly.express as px
 import plotly.graph_objects as go
 
-# Pies need non-negative values; use absolute PPV_Value and annotate sign in tooltip
-TOP_N_SUPPLIERS = st.slider("Top‑N suppliers for PPV pie", min_value=1, max_value=5, value=2, step=1)
-
 # Category pie (absolute values + sign in hover)
 cat_pie = ppv_cat.copy()
 cat_pie["PPV_Abs"] = cat_pie["PPV_Value"].abs()
@@ -387,7 +384,7 @@ cat_pie = cat_pie[cat_pie["PPV_Abs"] > 0].sort_values("PPV_Abs", ascending=False
 sup_pie = ppv_sup.copy()
 sup_pie["PPV_Abs"] = sup_pie["PPV_Value"].abs()
 sup_pie["Sign"] = np.where(sup_pie["PPV_Value"] < 0, "Favorable", "Unfavorable")
-sup_pie = sup_pie[sup_pie["PPV_Abs"] > 0].sort_values("PPV_Abs", ascending=False).head(TOP_N_SUPPLIERS)
+sup_pie = sup_pie[sup_pie["PPV_Abs"] > 0].sort_values("PPV_Abs", ascending=False)
 
 pie_left, pie_right = st.columns(2)
 with pie_left:
@@ -404,10 +401,10 @@ with pie_left:
     else:
         st.info("No PPV data available for the selected period & filters.")
 with pie_right:
-    st.caption(f"PPV value share by Supplier (Top {TOP_N_SUPPLIERS}, absolute, sign in tooltip)")
+    st.caption(f"PPV value share by Supplier")
     if not sup_pie.empty:
         fig_sup = px.pie(
-            sup_pie, names="Supplier", values="PPV_Abs", hole=0.35, title=f"PPV by Supplier (Top {TOP_N_SUPPLIERS})"
+            sup_pie, names="Supplier", values="PPV_Abs", hole=0.35, title=f"PPV by Supplier"
         )
         fig_sup.update_traces(
             hovertemplate="**%{label}**<br>PPV ₹%{value:,.0f}<br>Sign: %{customdata}<extra></extra>",
@@ -612,10 +609,6 @@ with sv_tab:
 
     st.divider()
 
-    # Comparison charts: Category
-    st.subheader("Savings Comparison by Category")
-    TOP_N_CAT = st.slider("Top-N categories", min_value=2, max_value=5, value=2, step=1)
-
     cr_cat_curr = current["CR_by_cat"].head(TOP_N_CAT).copy(); cr_cat_curr["Period"] = "Current"
     if compare_prev and previous is not None:
         cr_cat_prev = previous["CR_by_cat"].copy()
@@ -625,7 +618,7 @@ with sv_tab:
     else:
         cr_cat_plot = cr_cat_curr
 
-    ca_cat_curr = current["CA_by_cat"].head(TOP_N_CAT).copy(); ca_cat_curr["Period"] = "Current"
+    ca_cat_curr = current["CA_by_cat"]; ca_cat_curr["Period"] = "Current"
     if compare_prev and previous is not None:
         ca_cat_prev = previous["CA_by_cat"].copy()
         top_cats2 = ca_cat_curr["Item_Category"].tolist()
@@ -655,11 +648,7 @@ with sv_tab:
 
     st.divider()
 
-    # Comparison charts: Supplier
-    st.subheader("Savings Comparison by Supplier")
-    TOP_N_SUP = st.slider("Top-N suppliers", min_value=2, max_value=5, value=2, step=1)
-
-    cr_sup_curr = current["CR_by_sup"].head(TOP_N_SUP).copy(); cr_sup_curr["Period"] = "Current"
+    cr_sup_curr = current["CR_by_sup"].copy(); cr_sup_curr["Period"] = "Current"
     if compare_prev and previous is not None:
         cr_sup_prev = previous["CR_by_sup"].copy(); top_sups = cr_sup_curr["Supplier"].tolist()
         cr_sup_prev = cr_sup_prev[cr_sup_prev["Supplier"].isin(top_sups)]; cr_sup_prev["Period"] = "Previous"
@@ -667,7 +656,7 @@ with sv_tab:
     else:
         cr_sup_plot = cr_sup_curr
 
-    ca_sup_curr = current["CA_by_sup"].head(TOP_N_SUP).copy(); ca_sup_curr["Period"] = "Current"
+    ca_sup_curr = current["CA_by_sup"].copy(); ca_sup_curr["Period"] = "Current"
     if compare_prev and previous is not None:
         ca_sup_prev = previous["CA_by_sup"].copy(); top_sups2 = ca_sup_curr["Supplier"].tolist()
         ca_sup_prev = ca_sup_prev[ca_sup_prev["Supplier"].isin(top_sups2)]; ca_sup_prev["Period"] = "Previous"
