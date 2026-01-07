@@ -641,12 +641,12 @@ with sv_tab:
     c_left, c_right = st.columns(2)
     with c_left:      
         if compare_prev and previous is not None:
-            st.download_button("Download CR by Category (Previous, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
+            st.download_button("Download CR by Category (Previous & Current, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
         else:
             st.download_button("Download CR by Category (Current, CSV)", data=current["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_current.csv", mime="text/csv")
     with c_right:
         if compare_prev and previous is not None:
-            st.download_button("Download CA by Category (Previous, CSV)", data=combined_CA_df.to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
+            st.download_button("Download CA by Category (Previous & Current, CSV)", data=combined_CA_df.to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
         else:
             st.download_button("Download CA by Category (Current, CSV)", data=current["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_current.csv", mime="text/csv")
     st.divider()
