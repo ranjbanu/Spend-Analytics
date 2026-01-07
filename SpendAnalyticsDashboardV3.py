@@ -422,23 +422,11 @@ with c_left:
         ppv_cat[["Item_Category", "PPV_Value", "PPV_Pct", "spend"]].round(2),
         use_container_width=True
     )
-    st.download_button(
-        "Download CSV (PPV by Category)",
-        data=ppv_cat.to_csv(index=False),
-        file_name="ppv_by_category.csv",
-        mime="text/csv"
-    )
 with c_right:
     st.caption("PPV by Supplier (negative = favorable)")
     st.dataframe(
         ppv_sup[["Supplier", "PPV_Value", "PPV_Pct", "spend"]].round(2),
         use_container_width=True
-    )
-    st.download_button(
-        "Download CSV (PPV by Supplier)",
-        data=ppv_sup.to_csv(index=False),
-        file_name="ppv_by_supplier.csv",
-        mime="text/csv"
     )
 
 
