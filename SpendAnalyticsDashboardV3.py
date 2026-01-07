@@ -649,7 +649,7 @@ with sv_tab:
         [current["CA_by_cat"].assign(Source="Current"),
          previous["CA_by_cat"].assign(Source="Previous")],
         ignore_index=True
-    )
+        )
         
     if compare_prev and previous is not None:
         st.download_button("Download CR by Category (Previous, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
@@ -690,16 +690,16 @@ with sv_tab:
         st.plotly_chart(fig4, use_container_width=True)
 
     if compare_prev and previous is not None:
-    combined_CR_sup_df = pd.concat(
-        [current["CR_by_sup"].assign(Source="Current"),
-         previous["CR_by_sup"].assign(Source="Previous")],
+        combined_CR_sup_df = pd.concat(
+            [current["CR_by_sup"].assign(Source="Current"),
+             previous["CR_by_sup"].assign(Source="Previous")],
+            ignore_index=True
+        )
+        combined_CA_sup_df = pd.concat(
+        [current["CA_by_sup"].assign(Source="Current"),
+         previous["CA_by_sup"].assign(Source="Previous")],
         ignore_index=True
-    )
-    combined_CA_sup_df = pd.concat(
-    [current["CA_by_sup"].assign(Source="Current"),
-     previous["CA_by_sup"].assign(Source="Previous")],
-    ignore_index=True
-    )
+        )
 
     if compare_prev and previous is not None:
         st.download_button("Download CR by Supplier (Previous, CSV)", data=combined_CR_sup_df.to_csv(index=False), file_name="cr_by_supplier_previous.csv", mime="text/csv")
