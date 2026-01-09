@@ -4,6 +4,168 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, date, timedelta
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+
+# =========================
+# Time-series: SARIMA forecast by category (simplified, no Holt-Winters)
+# =========================
+
+def _ensure_month_col(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure a proper monthly Period column named 'month'."""
+    d = df.copy()
+    if "month" in d.columns:
+        if d["month"].dtype == object:
+            d["month"] = pd.PeriodIndex(d["month"], freq="M")
+    else:
+        d["Invoice_Date"] = pd.to_datetime(d["Invoice_Date"], dayfirst=True, errors="coerce")
+        d["month"] = d["Invoice_Date"].dt.to_period("M")
+    return d
+
+def _reindex_months_continuous(series: pd.Series) -> pd.Series:
+    """Ensure monthly continuity; fill missing months with 0 spend."""
+    if series.empty:
+        return series
+    idx = pd.period_range(series.index.min(), series.index.max(), freq="M")
+    return series.reindex(idx).fillna(0.0)
+
+def _sarima_best(series: pd.Series, season: int = 12):
+    """
+    Fit a small SARIMA grid and return the best by AIC.
+    Grid: (p,d,q) in {0,1} x {0,1} x {0,1}, (P,D,Q) in {0,1} with seasonal period.
+    """
+    try:
+        from statsmodels.tsa.statespace.sarimax import SARIMAX
+    except Exception:
+        return None  # statsmodels missing; caller will fallback
+
+    y = series.astype(float)
+    d_candidates = [0, 1]
+    D_candidates = [0, 1]
+    p_candidates = q_candidates = P_candidates = Q_candidates = [0, 1]
+
+    best_model = None
+    best_aic = np.inf
+    for p in p_candidates:
+        for d in d_candidates:
+            for q in q_candidates:
+                for P in P_candidates:
+                    for D in D_candidates:
+                        for Q in Q_candidates:
+                            order = (p, d, q)
+                            sorder = (P, D, Q, season)
+                            try:
+                                mod = SARIMAX(
+                                    y, order=order, seasonal_order=sorder,
+                                    enforce_stationarity=False, enforce_invertibility=False
+                                )
+                                res = mod.fit(disp=False)
+                                if res.aic < best_aic and np.isfinite(res.aic):
+                                    best_aic = res.aic
+                                    best_model = res
+                            except Exception:
+                                continue
+    return best_model  # may be None
+
+def _seasonal_naive(series: pd.Series, horizon: int = 3, season: int = 12):
+    """
+    Seasonal naive baseline (used only as fallback when SARIMA can't fit).
+    ŷ_{t+h} = y_{t+h-season} if available, else last observed.
+    CI estimated from residual std vs seasonal lag (indicative only).
+    """
+    y = series.astype(float)
+    n = len(y)
+    residuals = []
+    if n > season:
+        residuals = [y.iloc[i] - y.iloc[i - season] for i in range(season, n)]
+    res_std = float(np.nanstd(residuals)) if residuals else float(np.nanstd(y))
+    z80, z95 = 1.28, 1.96
+
+    f_vals = []
+    for h in range(1, horizon + 1):
+        src_idx = n - season + h - 1
+        if 0 <= src_idx < n:
+            val = float(y.iloc[src_idx])
+        else:
+            val = float(y.iloc[-1]) if n else 0.0
+        f_vals.append(val)
+
+    ci80 = [(v - z80 * res_std, v + z80 * res_std) for v in f_vals]
+    ci95 = [(v - z95 * res_std, v + z95 * res_std) for v in f_vals]
+    return f_vals, ci80, ci95
+
+def forecast_by_category_timeseries_simple(df: pd.DataFrame,
+                                           horizon: int = 3,
+                                           season: int = 12,
+                                           min_points: int = 6,
+                                           exclude_cancelled: bool = True) -> pd.DataFrame:
+    """
+    Forecast monthly spend by Item_Category for next 'horizon' months using SARIMA.
+    If SARIMA can't fit or history is too short, use seasonal-naive fallback.
+
+    Returns (all rounded to 2 decimals):
+      Item_Category, Forecast_Month, Forecast, CI80_Low, CI80_High, CI95_Low, CI95_High, Model
+    """
+    d = _ensure_month_col(df)
+
+    if exclude_cancelled and "Invoice_Status" in d.columns:
+        d = d[~d["Invoice_Status"].eq("Cancelled")].copy()
+
+    by_cat = (d.groupby(["Item_Category", "month"])["Invoice_Amount"]
+                .sum().reset_index())
+
+    results = []
+    for cat, gcat in by_cat.groupby("Item_Category"):
+        series = gcat.set_index("month")["Invoice_Amount"].sort_index()
+        series = _reindex_months_continuous(series)
+
+        model_name = ""
+        f_vals = ci80_low = ci80_high = ci95_low = ci95_high = None
+
+        # Try SARIMA if enough points; else fallback
+        sarima_res = None
+        if len(series) >= min_points:
+            sarima_res = _sarima_best(series, season=season)
+
+        if sarima_res is not None:
+            try:
+                fc = sarima_res.get_forecast(steps=horizon)
+                f_vals = list(map(float, fc.predicted_mean))
+                ci95_df = fc.conf_int(alpha=0.05)
+                ci80_df = fc.conf_int(alpha=0.20)
+                ci95_low = list(map(float, ci95_df.iloc[:, 0]))
+                ci95_high = list(map(float, ci95_df.iloc[:, 1]))
+                ci80_low = list(map(float, ci80_df.iloc[:, 0]))
+                ci80_high = list(map(float, ci80_df.iloc[:, 1]))
+                model_name = "SARIMA"
+            except Exception:
+                f_vals, ci80, ci95 = _seasonal_naive(series, horizon=horizon, season=season)
+                ci80_low, ci80_high = [c[0] for c in ci80], [c[1] for c in ci80]
+                ci95_low, ci95_high = [c[0] for c in ci95], [c[1] for c in ci95]
+                model_name = "Seasonal Naive (fallback)"
+        else:
+            f_vals, ci80, ci95 = _seasonal_naive(series, horizon=horizon, season=season)
+            ci80_low, ci80_high = [c[0] for c in ci80], [c[1] for c in ci80]
+            ci95_low, ci95_high = [c[0] for c in ci95], [c[1] for c in ci95]
+            model_name = "Seasonal Naive (fallback)"
+
+        last_per = series.index.max() if not series.empty else pd.Period(pd.Timestamp.today(), freq="M")
+        future_periods = [last_per + i for i in range(1, horizon + 1)]
+
+        for i in range(horizon):
+            results.append({
+                "Item_Category": cat,
+                "Forecast_Month": future_periods[i].strftime("%Y-%m"),
+                "Forecast": round(float(f_vals[i]), 2),
+                "CI80_Low": round(float(ci80_low[i]), 2),
+                "CI80_High": round(float(ci80_high[i]), 2),
+                "CI95_Low": round(float(ci95_low[i]), 2),
+                "CI95_High": round(float(ci95_high[i]), 2),
+                "Model": model_name
+            })
+
+    return pd.DataFrame(results)
+
 
 # ---------------------------
 # Page & Theme
@@ -732,3 +894,56 @@ with sv_tab:
 - **Comparison window:** Previous period is equal length and ends the day before the current period starts; all other filters are identical.
 - **Edge cases:** Missing dates and zeros are ignored in weighted calculations; results may differ slightly when data is sparse.
         """)
+
+
+# =============================================================
+# 📈 Time-series Forecast (SARIMA only): Category Spend (Next Quarter)
+# =============================================================
+import streamlit as st
+
+st.subheader("📈 Time-series Forecast (SARIMA): Category Spend for Next Quarter (Simplified)")
+
+# Choose training data slice
+data_source = st.radio(
+    "Training data source",
+    ["Full dataset", "Current filtered slice"],
+    index=0,
+    help="Full dataset captures seasonality better; filtered slice applies your sidebar filters."
+)
+if "base_df" in globals() and data_source == "Full dataset":
+    df_input = base_df.copy()
+elif "filtered" in globals() and data_source == "Current filtered slice":
+    df_input = filtered.copy()
+else:
+    df_input = df.copy()
+
+# Controls
+horizon = st.slider("Forecast horizon (months)", 1, 12, 3, step=1)
+season = st.slider("Seasonal period (months)", 3, 24, 12, step=1)
+min_points = st.slider("Minimum historical months per category", 3, 36, 6, step=1)
+exclude_cancelled = st.checkbox("Exclude 'Cancelled' invoices", value=True)
+
+# Run forecast (SARIMA-only with seasonal-naive fallback)
+fc_ts_simple = forecast_by_category_timeseries_simple(
+    df_input, horizon=horizon, season=season, min_points=min_points, exclude_cancelled=exclude_cancelled
+)
+
+# Show
+st.dataframe(fc_ts_simple, use_container_width=True)
+
+# Download CSV
+st.download_button(
+    label="Download Forecast by Category (CSV)",
+    data=fc_ts_simple.to_csv(index=False),
+    file_name=f"forecast_by_category_sarima_next_{horizon}_months.csv",
+    mime="text/csv"
+)
+
+with st.expander("Notes"):
+    st.markdown("""
+- **Model:** SARIMA chosen via a small AIC grid. If the category history is too short or the fit fails, we use **Seasonal-Naive**.
+- **Confidence intervals:** 80% and 95% from SARIMA; for the fallback we estimate bands using residual volatility vs seasonal lag.
+- **Rounding:** All values are rounded to **2 decimals**.
+- **Tip:** Prefer **Full dataset** for training to learn seasonality robustly; filtered slices are great for scenario-specific views.
+""")
+
