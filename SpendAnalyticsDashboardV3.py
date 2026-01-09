@@ -157,7 +157,6 @@ def forecast_by_category_timeseries_simple(df: pd.DataFrame,
                 "Item_Category": cat,
                 "Forecast_Month": future_periods[i].strftime("%Y-%m"),
                 "Forecast": round(float(f_vals[i]), 2),
-                "Model": model_name
             })
 
     return pd.DataFrame(results)
