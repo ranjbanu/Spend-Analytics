@@ -13,14 +13,9 @@ import pandas as pd
 import numpy as np
 
 def _use_negotiated(df_in: pd.DataFrame) -> pd.DataFrame:
-    """
-    Prefer enriched negotiated price if present; otherwise original.
-    """
     d = df_in.copy()
-    if "Negotiated_Price_Enriched" in d.columns:
-        d["neg_used"] = d["Negotiated_Price_Enriched"].where(d["Negotiated_Price_Enriched"].notna(), d["Negotiated_Price"])
-    else:
-        d["neg_used"] = d["Negotiated_Price"]
+    if "Negotiated_Price" in d.columns:
+        d["neg_used"] = d["Negotiated_Price"])
     return d
 
 def _minmax_by_category(series: pd.Series, by_key: pd.Series) -> pd.Series:
@@ -1079,7 +1074,6 @@ with tabs[2]:
     st.caption("Recommend the best supplier per category using cost, reliability, risk, and volume fit. Weights are tunable.")
 
     # --- Inputs ---
-    use_enriched = st.checkbox("Use enriched negotiated price (if available)", value=True)
     wcost = st.slider("Weight: Cost (PPV)", 0, 100, 40, step=5)
     wrel  = st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
     wrisk = st.slider("Weight: Risk (discrepancy & late)", 0, 100, 20, step=5)
@@ -1095,9 +1089,6 @@ with tabs[2]:
 
     # Data slice: use CURRENT filtered selection
     d_in = filtered.copy()
-    if not use_enriched and "Negotiated_Price_Enriched" in d_in.columns:
-        # If user unchecks enriched, drop it to force original negotiated price
-        d_in = d_in.drop(columns=["Negotiated_Price_Enriched"])
 
     # --- Compute KPIs & score ---
     kpis = compute_supplier_kpis(d_in)
