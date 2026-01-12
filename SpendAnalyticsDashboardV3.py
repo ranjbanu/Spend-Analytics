@@ -7,6 +7,146 @@ from datetime import datetime, date, timedelta
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 
+# ---------- Supplier Optimization: KPIs + Scoring ----------
+
+import pandas as pd
+import numpy as np
+
+def _use_negotiated(df_in: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prefer enriched negotiated price if present; otherwise original.
+    """
+    d = df_in.copy()
+    if "Negotiated_Price_Enriched" in d.columns:
+        d["neg_used"] = d["Negotiated_Price_Enriched"].where(d["Negotiated_Price_Enriched"].notna(), d["Negotiated_Price"])
+    else:
+        d["neg_used"] = d["Negotiated_Price"]
+    return d
+
+def _minmax_by_category(series: pd.Series, by_key: pd.Series) -> pd.Series:
+    """
+    Min-max normalize a series within each Item_Category group to [0,1].
+    For constant or NaN groups, returns 0.5 (neutral).
+    """
+    def _norm(g):
+        g = g.astype(float)
+        mn, mx = g.min(), g.max()
+        if not np.isfinite(mn) or not np.isfinite(mx) or mx == mn:
+            return pd.Series(0.5, index=g.index)  # neutral when no variation
+        return (g - mn) / (mx - mn)
+    return series.groupby(by_key).apply(_norm)
+
+def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregates supplier KPIs per Item_Category:
+    - PPV_Value, PPV_Base, PPV_Pct
+    - OTD rate, discrepancy rate, late-payment rate
+    - Spend, Quantity, Txn count
+    """
+    if d.empty:
+        return pd.DataFrame(columns=[
+            "Item_Category","Supplier","spend","qty","txn_count",
+            "ppv_value","ppv_base","ppv_pct","otd_rate","disc_rate","late_rate"
+        ])
+
+    d = _use_negotiated(d)
+
+    # Row-level PPV terms
+    d["PPV_Value_row"] = (d["Unit_Price"] - d["neg_used"]) * d["Quantity"]
+    d["PPV_Base_row"]  = (d["neg_used"] * d["Quantity"])
+
+    # Boolean OTD
+    otd_bool = d["On_Time_Delivery"].astype(str).str.lower().eq("yes")
+    d["otd_bool"] = otd_bool
+
+    # Aggregation per Item_Category + Supplier
+    grp = d.groupby(["Item_Category","Supplier"], dropna=False)
+    out = grp.agg(
+        spend=("Invoice_Amount","sum"),
+        qty=("Quantity","sum"),
+        txn_count=("PO_ID","count"),
+        ppv_value=("PPV_Value_row","sum"),
+        ppv_base=("PPV_Base_row","sum"),
+        otd_rate=("otd_bool","mean"),
+        disc_rate=("Invoice_Discrepancy_Reason", lambda s: s.notna().mean()),
+        late_rate=("is_late","mean")
+    ).reset_index()
+
+    # PPV%
+    out["ppv_pct"] = np.where(out["ppv_base"] > 0, out["ppv_value"] / out["ppv_base"] * 100.0, np.nan)
+
+    return out
+
+def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_ppv_pct: float = 0.7) -> pd.DataFrame:
+    """
+    Scores suppliers per category with a composite 0–100 score.
+    weights keys: {'cost','reliability','risk','volume'} in [0,1] (we’ll normalize).
+    cost_mix_ppv_pct: share of PPV% vs PPV value in cost sub-score (default 70%).
+    """
+    dfk = kpis_df.copy()
+
+    # Prepare normalization keys
+    cat_key = dfk["Item_Category"]
+
+    # --- Cost sub-score ---
+    # Normalize PPV% within category (lower is better → invert)
+    ppv_pct_norm = _minmax_by_category(dfk["ppv_pct"].fillna(0.0), cat_key)
+    cost_ppv_pct_score = 1.0 - ppv_pct_norm
+
+    # Penalize only unfavorable PPV value (positive PPV_Value) → normalize
+    unf_ppv_val = dfk["ppv_value"].clip(lower=0)  # negatives (favorable) become 0
+    unf_ppv_val_norm = _minmax_by_category(unf_ppv_val.fillna(0.0), cat_key)
+    cost_ppv_val_score = 1.0 - unf_ppv_val_norm
+
+    dfk["cost_score"] = cost_mix_ppv_pct * cost_ppv_pct_score + (1.0 - cost_mix_ppv_pct) * cost_ppv_val_score
+
+    # --- Reliability sub-score ---
+    rel_norm = _minmax_by_category(dfk["otd_rate"].fillna(0.0), cat_key)
+    dfk["reliability_score"] = rel_norm  # higher OTD is better
+
+    # --- Risk sub-score ---
+    # Composite risk = 0.5 * discrepancy + 0.5 * late
+    risk_raw = 0.5 * dfk["disc_rate"].fillna(0.0) + 0.5 * dfk["late_rate"].fillna(0.0)
+    risk_norm = _minmax_by_category(risk_raw, cat_key)
+    dfk["risk_score"] = 1.0 - risk_norm  # lower risk better
+
+    # --- Volume sub-score ---
+    # Combine spend & qty (equal weight), then normalize within category
+    vol_raw = 0.5 * dfk["spend"].fillna(0.0) + 0.5 * dfk["qty"].fillna(0.0)
+    vol_norm = _minmax_by_category(vol_raw, cat_key)
+    dfk["volume_score"] = vol_norm  # larger volume → better fit/capacity
+
+    # Normalize weights to sum 1
+    w_cost = float(weights.get("cost", 0.4))
+    w_rel  = float(weights.get("reliability", 0.3))
+    w_risk = float(weights.get("risk", 0.2))
+    w_vol  = float(weights.get("volume", 0.1))
+    w_sum = max(w_cost + w_rel + w_risk + w_vol, 1e-6)
+    w_cost, w_rel, w_risk, w_vol = (w_cost/w_sum, w_rel/w_sum, w_risk/w_sum, w_vol/w_sum)
+
+    # Final composite score (0–100)
+    dfk["score_0_1"] = (
+        w_cost * dfk["cost_score"] +
+        w_rel  * dfk["reliability_score"] +
+        w_risk * dfk["risk_score"] +
+        w_vol  * dfk["volume_score"]
+    )
+    dfk["Supplier_Score"] = (dfk["score_0_1"] * 100.0).round(2)
+
+    # Reason codes (brief)
+    def _reason(row):
+        reasons = []
+        if row["cost_score"] >= 0.7: reasons.append("Low unfavorable PPV")
+        if row["reliability_score"] >= 0.7: reasons.append(f"High OTD ({row['otd_rate']*100:.1f}%)")
+        if row["risk_score"] >= 0.7: reasons.append("Low discrepancy/late risk")
+        if row["volume_score"] >= 0.7: reasons.append(f"Strong volume fit (₹{row['spend']:,.0f}, qty {row['qty']:.0f})")
+        return "; ".join(reasons) if reasons else "Balanced performance"
+
+    dfk["Rationale"] = dfk.apply(_reason, axis=1)
+
+    return dfk
+``
+
 # =========================
 # Time-series: SARIMA forecast by category (simplified, no Holt-Winters)
 # =========================
@@ -165,7 +305,7 @@ def forecast_by_category_timeseries_simple(df: pd.DataFrame,
 # ---------------------------
 # Page & Theme
 # ---------------------------
-tabs = st.tabs(["💸 Dashboard", "📈 Forecasting"])
+tabs = st.tabs(["💸 Dashboard", "📈 Forecasting","🤝 Supplier Optimization")
 with tabs[0]:
     st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout="wide")
     # ---------------------------
@@ -934,4 +1074,142 @@ with tabs[1]:
     - **Rounding:** All values are rounded to **2 decimals**.
     - **Tip:** Prefer **Full dataset** for training to learn seasonality robustly; filtered slices are great for scenario-specific views.
     """)
+
+with tabs[2]:
+    st.header("🤝 Supplier Optimization")
+    st.caption("Recommend the best supplier per category using cost, reliability, risk, and volume fit. Weights are tunable.")
+
+    # --- Inputs ---
+    use_enriched = st.checkbox("Use enriched negotiated price (if available)", value=True)
+    wcost = st.slider("Weight: Cost (PPV)", 0, 100, 40, step=5)
+    wrel  = st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
+    wrisk = st.slider("Weight: Risk (discrepancy & late)", 0, 100, 20, step=5)
+    wvol  = st.slider("Weight: Volume fit (spend & qty)", 0, 100, 10, step=5)
+    cost_mix_ppv_pct = st.slider("Cost mix: PPV% vs PPV value (PPV% weight)", 0, 100, 70, step=5)
+
+    weights = {
+        "cost": wcost/100.0,
+        "reliability": wrel/100.0,
+        "risk": wrisk/100.0,
+        "volume": wvol/100.0
+    }
+
+    # Data slice: use CURRENT filtered selection
+    d_in = filtered.copy()
+    if not use_enriched and "Negotiated_Price_Enriched" in d_in.columns:
+        # If user unchecks enriched, drop it to force original negotiated price
+        d_in = d_in.drop(columns=["Negotiated_Price_Enriched"])
+
+    # --- Compute KPIs & score ---
+    kpis = compute_supplier_kpis(d_in)
+    scored = score_suppliers(kpis, weights, cost_mix_ppv_pct=cost_mix_ppv_pct/100.0)
+
+    # --- Recommendation per category (top by Supplier_Score) ---
+    st.subheader("Recommended Supplier per Category")
+    recs = (
+        scored.sort_values(["Item_Category","Supplier_Score"], ascending=[True, False])
+              .groupby("Item_Category")
+              .head(1)
+              .copy()
+    )
+
+    # Pretty columns & rounding
+    show_cols = [
+        "Item_Category","Supplier","Supplier_Score",
+        "spend","qty","txn_count","ppv_pct","ppv_value","otd_rate","disc_rate","late_rate","Rationale"
+    ]
+    recs_view = recs[show_cols].copy()
+    recs_view["Supplier_Score"] = recs_view["Supplier_Score"].round(2)
+    recs_view["spend"] = recs_view["spend"].round(2)
+    recs_view["qty"] = recs_view["qty"].round(2)
+    recs_view["ppv_pct"] = recs_view["ppv_pct"].round(2)
+    recs_view["ppv_value"] = recs_view["ppv_value"].round(2)
+    recs_view["otd_rate"] = (recs_view["otd_rate"]*100.0).round(1)
+    recs_view["disc_rate"] = (recs_view["disc_rate"]*100.0).round(1)
+    recs_view["late_rate"] = (recs_view["late_rate"]*100.0).round(1)
+    recs_view = recs_view.rename(columns={
+        "Supplier_Score": "Score (0–100)",
+        "spend": "Spend (₹)",
+        "qty": "Qty",
+        "ppv_pct": "PPV (%)",
+        "ppv_value": "PPV Value (₹)",
+        "otd_rate": "OTD (%)",
+        "disc_rate": "Discrepancy (%)",
+        "late_rate": "Late payments (%)"
+    })
+
+    st.dataframe(recs_view, use_container_width=True, height=420)
+
+    st.download_button(
+        "Download recommendations (CSV)",
+        data=recs_view.to_csv(index=False),
+        file_name="supplier_recommendations_by_category.csv",
+        mime="text/csv"
+    )
+
+    st.divider()
+
+    # --- Drilldown ranking for a selected category ---
+    if not scored.empty:
+        cat_sel = st.selectbox(
+            "Drilldown: choose a category",
+            options=sorted(scored["Item_Category"].dropna().unique().tolist())
+        )
+
+        if cat_sel:
+            drill = scored[scored["Item_Category"] == cat_sel].copy()
+            drill = drill.sort_values("Supplier_Score", ascending=False)
+
+            st.caption(f"Supplier ranking for '{cat_sel}' (0–100)")
+            import plotly.graph_objects as go
+            fig = go.Figure(go.Bar(
+                x=drill["Supplier"],
+                y=drill["Supplier_Score"],
+                text=[f"OTD {r*100:.1f}% | PPV {p:.2f}%" if pd.notna(p) else f"OTD {r*100:.1f}%"
+                      for r, p in zip(drill["otd_rate"], drill["ppv_pct"])],
+                textposition="auto"
+            ))
+            fig.update_layout(yaxis_title="Score (0–100)", xaxis_title="")
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Download drilldown
+            drill_view = drill[show_cols].copy()
+            drill_view["Supplier_Score"] = drill_view["Supplier_Score"].round(2)
+            drill_view["spend"] = drill_view["spend"].round(2)
+            drill_view["qty"] = drill_view["qty"].round(2)
+            drill_view["ppv_pct"] = drill_view["ppv_pct"].round(2)
+            drill_view["ppv_value"] = drill_view["ppv_value"].round(2)
+            drill_view["otd_rate"] = (drill_view["otd_rate"]*100.0).round(1)
+            drill_view["disc_rate"] = (drill_view["disc_rate"]*100.0).round(1)
+            drill_view["late_rate"] = (drill_view["late_rate"]*100.0).round(1)
+            drill_view = drill_view.rename(columns={
+                "Supplier_Score": "Score (0–100)",
+                "spend": "Spend (₹)",
+                "qty": "Qty",
+                "ppv_pct": "PPV (%)",
+                "ppv_value": "PPV Value (₹)",
+                "otd_rate": "OTD (%)",
+                "disc_rate": "Discrepancy (%)",
+                "late_rate": "Late payments (%)"
+            })
+
+            st.download_button(
+                f"Download supplier ranking for {cat_sel} (CSV)",
+                data=drill_view.to_csv(index=False),
+                file_name=f"supplier_ranking_{cat_sel}.csv",
+                mime="text/csv"
+            )
+
+    with st.expander("Scoring methodology"):
+        st.markdown("""
+    **Sub-scores (normalized per category):**
+    - **Cost** = blend of *inverted* PPV% and *inverted* unfavorable PPV value (positives only),
+    - **Reliability** = normalized On-Time Delivery rate (higher is better),
+    - **Risk** = inverted normalized composite of discrepancy & late-payment rates,
+    - **Volume** = normalized mix of historical spend & quantity.
+    
+    **Final Score (0–100)** = weighted sum of sub-scores using your sliders.
+    Default weights: **Cost 40%**, **Reliability 30%**, **Risk 20%**, **Volume 10%**.
+    """)
+        
 
