@@ -903,13 +903,13 @@ df_input = base_df.copy()
 
 # Controls
 horizon = st.slider("Forecast horizon (months)", 1, 12, 3, step=1)
-season = st.slider("Seasonal period (months)", 12, 24, 12, step=1)
-min_points = st.slider("Minimum historical months per category", 3, 36, 6, step=1)
+#season = st.slider("Seasonal period (months)", 12, 24, 12, step=1)
+#min_points = st.slider("Minimum historical months per category", 3, 36, 6, step=1)
 exclude_cancelled = st.checkbox("Exclude 'Cancelled' invoices", value=True)
 
 # Run forecast (SARIMA-only with seasonal-naive fallback)
 fc_ts_simple = forecast_by_category_timeseries_simple(
-    df_input, horizon=horizon, season=season, min_points=min_points, exclude_cancelled=exclude_cancelled
+    df_input, horizon=horizon, season=12, min_points=36, exclude_cancelled=exclude_cancelled
 )
 
 # Show
