@@ -1145,14 +1145,14 @@ with tabs[2]:
     st.divider()
 
     # --- Drilldown ranking for a selected category ---
-    if not scored.empty:
+    if not scored_rank.empty:
         cat_sel = st.selectbox(
             "Drilldown: choose a category",
             options=sorted(scored["Item_Category"].dropna().unique().tolist())
         )
 
         if cat_sel:
-            drill = scored[scored["Item_Category"] == cat_sel].copy()
+            drill = scored_rank[scored_rank["Item_Category"] == cat_sel].copy()
             drill = drill.sort_values("Supplier_Score", ascending=False)
 
             st.caption(f"Supplier ranking for '{cat_sel}' (0–100)")
