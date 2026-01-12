@@ -18,18 +18,25 @@ def _use_negotiated(df_in: pd.DataFrame) -> pd.DataFrame:
         d["neg_used"] = d["Negotiated_Price"]
     return d
 
+
 def _minmax_by_category(series: pd.Series, by_key: pd.Series) -> pd.Series:
     """
-    Min-max normalize a series within each Item_Category group to [0,1].
-    For constant or NaN groups, returns 0.5 (neutral).
+    Min-max normalize within each Item_Category group to [0,1].
+    Returns a Series aligned to the original index.
+    For groups with constant or non-finite ranges, return 0.5 (neutral).
     """
-    def _norm(g):
-        g = g.astype(float)
-        mn, mx = g.min(), g.max()
-        if not np.isfinite(mn) or not np.isfinite(mx) or mx == mn:
-            return pd.Series(0.5, index=g.index)  # neutral when no variation
-        return (g - mn) / (mx - mn)
-    return series.groupby(by_key).apply(_norm)
+    s = series.astype(float)
+    gmin = s.groupby(by_key).transform("min")
+    gmax = s.groupby(by_key).transform("max")
+    rng = gmax - gmin
+
+    norm = (s - gmin) / rng
+    # neutral 0.5 when range is 0 or NaN
+    norm = norm.where(rng > 0, 0.5)
+    # replace remaining non-finites
+    norm = norm.fillna(0.5)
+    return norm
+
 
 def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
     """
