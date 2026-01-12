@@ -305,7 +305,7 @@ def forecast_by_category_timeseries_simple(df: pd.DataFrame,
 # ---------------------------
 # Page & Theme
 # ---------------------------
-tabs = st.tabs(["💸 Dashboard", "📈 Forecasting","🤝 Supplier Optimization")
+tabs = st.tabs(["💸 Dashboard", "📈 Forecasting","🤝 Supplier Optimization"])
 with tabs[0]:
     st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout="wide")
     # ---------------------------
