@@ -1075,7 +1075,7 @@ with tabs[2]:
                        .groupby("Item_Category").head(1))
     
     st.subheader("Recommended Supplier per Category (Rank Aggregation)")
-    st.dataframe(recs[["Item_Category","Supplier","Supplier_Score","Rationale"]].round(2), use_container_width=True)
+    st.dataframe(recs[["Item_Category","Supplier","Supplier_Score"]].round(2), use_container_width=True)
     st.download_button(
         "Download recommendations (CSV)",
         data=recs_view.to_csv(index=False),
