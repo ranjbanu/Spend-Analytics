@@ -99,11 +99,11 @@ def score_suppliers_rank_aggregate(kpis_df: pd.DataFrame) -> pd.DataFrame:
 
     # Risk: lower better → composite of discrepancy & late
     risk_raw = 0.5 * dfk["disc_rate"].fillna(0.0) + 0.5 * dfk["late_rate"].fillna(0.0)
-    dfk["r_risk"] = dfk.groupby(cat)[risk_raw].rank(method="min", ascending=True)
+    dfk["r_risk"] = risk_raw.groupby(cat).rank(method="min", ascending=True)
 
     # Volume: larger better (spend+qty)
     vol_raw = 0.5 * dfk["spend"].fillna(0.0) + 0.5 * dfk["qty"].fillna(0.0)
-    dfk["r_vol"] = dfk.groupby(cat)[vol_raw].rank(method="min", ascending=False)
+    dfk["r_vol"] = vol_raw.groupby(cat).rank(method="min", ascending=False)
 
     # Final rank score (sum of ranks)
     dfk["rank_sum"] = (dfk["r_cost_pct"] + dfk["r_cost_val"] + dfk["r_rel"] + dfk["r_risk"] + dfk["r_vol"])
