@@ -1135,7 +1135,7 @@ with tabs[2]:
         "late_rate": "Late payments (%)"
     })
 
-    st.dataframe(recs_view, use_container_width=True, height=420)
+    st.dataframe(recs_view, use_container_width=True)
 
     st.download_button(
         "Download recommendations (CSV)",
@@ -1164,7 +1164,7 @@ with tabs[2]:
                 y=drill["Supplier_Score"],
                 text=[f"OTD {r*100:.1f}% | PPV {p:.2f}%" if pd.notna(p) else f"OTD {r*100:.1f}%"
                       for r, p in zip(drill["otd_rate"], drill["PPV_Pct"])],
-                textposition="auto"
+                textposition="top"
             ))
             fig.update_layout(yaxis_title="Score (0–100)", xaxis_title="")
             st.plotly_chart(fig, use_container_width=True)
