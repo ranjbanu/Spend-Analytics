@@ -41,7 +41,7 @@ def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
     if d.empty:
         return pd.DataFrame(columns=[
             "Item_Category","Supplier","spend","qty","txn_count",
-            "ppv_value","ppv_base","ppv_pct","otd_rate","disc_rate","late_rate"
+            "PPV_Value","ppv_base","PPV_Pct","otd_rate","disc_rate","late_rate"
         ])
 
     d = _use_negotiated(d)
@@ -60,7 +60,7 @@ def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
         spend=("Invoice_Amount","sum"),
         qty=("Quantity","sum"),
         txn_count=("PO_ID","count"),
-        ppv_value=("PPV_Value_row","sum"),
+        PPV_Value=("PPV_Value_row","sum"),
         ppv_base=("PPV_Base_row","sum"),
         otd_rate=("otd_bool","mean"),
         disc_rate=("Invoice_Discrepancy_Reason", lambda s: s.notna().mean()),
@@ -68,15 +68,15 @@ def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
     ).reset_index()
 
     # PPV%
-    out["ppv_pct"] = np.where(out["ppv_base"] > 0, out["ppv_value"] / out["ppv_base"] * 100.0, np.nan)
+    out["PPV_Pct"] = np.where(out["ppv_base"] > 0, out["PPV_Value"] / out["ppv_base"] * 100.0, np.nan)
 
     return out
 
-def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_ppv_pct: float = 0.7) -> pd.DataFrame:
+def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_PPV_Pct: float = 0.7) -> pd.DataFrame:
     """
     Scores suppliers per category with a composite 0–100 score.
     weights keys: {'cost','reliability','risk','volume'} in [0,1] (we’ll normalize).
-    cost_mix_ppv_pct: share of PPV% vs PPV value in cost sub-score (default 70%).
+    cost_mix_PPV_Pct: share of PPV% vs PPV value in cost sub-score (default 70%).
     """
     dfk = kpis_df.copy()
 
@@ -85,15 +85,15 @@ def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_ppv_pct: floa
 
     # --- Cost sub-score ---
     # Normalize PPV% within category (lower is better → invert)
-    ppv_pct_norm = _minmax_by_category(dfk["ppv_pct"].fillna(0.0), cat_key)
-    cost_ppv_pct_score = 1.0 - ppv_pct_norm
+    PPV_Pct_norm = _minmax_by_category(dfk["PPV_Pct"].fillna(0.0), cat_key)
+    cost_PPV_Pct_score = 1.0 - PPV_Pct_norm
 
     # Penalize only unfavorable PPV value (positive PPV_Value) → normalize
-    unf_ppv_val = dfk["ppv_value"].clip(lower=0)  # negatives (favorable) become 0
+    unf_ppv_val = dfk["PPV_Value"].clip(lower=0)  # negatives (favorable) become 0
     unf_ppv_val_norm = _minmax_by_category(unf_ppv_val.fillna(0.0), cat_key)
     cost_ppv_val_score = 1.0 - unf_ppv_val_norm
 
-    dfk["cost_score"] = cost_mix_ppv_pct * cost_ppv_pct_score + (1.0 - cost_mix_ppv_pct) * cost_ppv_val_score
+    dfk["cost_score"] = cost_mix_PPV_Pct * cost_PPV_Pct_score + (1.0 - cost_mix_PPV_Pct) * cost_ppv_val_score
 
     # --- Reliability sub-score ---
     rel_norm = _minmax_by_category(dfk["otd_rate"].fillna(0.0), cat_key)
@@ -1078,7 +1078,7 @@ with tabs[2]:
     wrel  = st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
     wrisk = st.slider("Weight: Risk (discrepancy & late)", 0, 100, 20, step=5)
     wvol  = st.slider("Weight: Volume fit (spend & qty)", 0, 100, 10, step=5)
-    cost_mix_ppv_pct = st.slider("Cost mix: PPV% vs PPV value (PPV% weight)", 0, 100, 70, step=5)
+    cost_mix_PPV_Pct = st.slider("Cost mix: PPV% vs PPV value (PPV% weight)", 0, 100, 70, step=5)
 
     weights = {
         "cost": wcost/100.0,
@@ -1092,7 +1092,7 @@ with tabs[2]:
 
     # --- Compute KPIs & score ---
     kpis = compute_supplier_kpis(d_in)
-    scored = score_suppliers(kpis, weights, cost_mix_ppv_pct=cost_mix_ppv_pct/100.0)
+    scored = score_suppliers(kpis, weights, cost_mix_PPV_Pct=cost_mix_PPV_Pct/100.0)
 
     # --- Recommendation per category (top by Supplier_Score) ---
     st.subheader("Recommended Supplier per Category")
@@ -1106,14 +1106,14 @@ with tabs[2]:
     # Pretty columns & rounding
     show_cols = [
         "Item_Category","Supplier","Supplier_Score",
-        "spend","qty","txn_count","ppv_pct","ppv_value","otd_rate","disc_rate","late_rate","Rationale"
+        "spend","qty","txn_count","PPV_Pct","PPV_Value","otd_rate","disc_rate","late_rate","Rationale"
     ]
     recs_view = recs[show_cols].copy()
     recs_view["Supplier_Score"] = recs_view["Supplier_Score"].round(2)
     recs_view["spend"] = recs_view["spend"].round(2)
     recs_view["qty"] = recs_view["qty"].round(2)
-    recs_view["ppv_pct"] = recs_view["ppv_pct"].round(2)
-    recs_view["ppv_value"] = recs_view["ppv_value"].round(2)
+    recs_view["PPV_Pct"] = recs_view["PPV_Pct"].round(2)
+    recs_view["PPV_Value"] = recs_view["PPV_Value"].round(2)
     recs_view["otd_rate"] = (recs_view["otd_rate"]*100.0).round(1)
     recs_view["disc_rate"] = (recs_view["disc_rate"]*100.0).round(1)
     recs_view["late_rate"] = (recs_view["late_rate"]*100.0).round(1)
@@ -1121,8 +1121,8 @@ with tabs[2]:
         "Supplier_Score": "Score (0–100)",
         "spend": "Spend (₹)",
         "qty": "Qty",
-        "ppv_pct": "PPV (%)",
-        "ppv_value": "PPV Value (₹)",
+        "PPV_Pct": "PPV (%)",
+        "PPV_Value": "PPV Value (₹)",
         "otd_rate": "OTD (%)",
         "disc_rate": "Discrepancy (%)",
         "late_rate": "Late payments (%)"
@@ -1156,7 +1156,7 @@ with tabs[2]:
                 x=drill["Supplier"],
                 y=drill["Supplier_Score"],
                 text=[f"OTD {r*100:.1f}% | PPV {p:.2f}%" if pd.notna(p) else f"OTD {r*100:.1f}%"
-                      for r, p in zip(drill["otd_rate"], drill["ppv_pct"])],
+                      for r, p in zip(drill["otd_rate"], drill["PPV_Pct"])],
                 textposition="auto"
             ))
             fig.update_layout(yaxis_title="Score (0–100)", xaxis_title="")
@@ -1167,8 +1167,8 @@ with tabs[2]:
             drill_view["Supplier_Score"] = drill_view["Supplier_Score"].round(2)
             drill_view["spend"] = drill_view["spend"].round(2)
             drill_view["qty"] = drill_view["qty"].round(2)
-            drill_view["ppv_pct"] = drill_view["ppv_pct"].round(2)
-            drill_view["ppv_value"] = drill_view["ppv_value"].round(2)
+            drill_view["PPV_Pct"] = drill_view["PPV_Pct"].round(2)
+            drill_view["PPV_Value"] = drill_view["PPV_Value"].round(2)
             drill_view["otd_rate"] = (drill_view["otd_rate"]*100.0).round(1)
             drill_view["disc_rate"] = (drill_view["disc_rate"]*100.0).round(1)
             drill_view["late_rate"] = (drill_view["late_rate"]*100.0).round(1)
@@ -1176,8 +1176,8 @@ with tabs[2]:
                 "Supplier_Score": "Score (0–100)",
                 "spend": "Spend (₹)",
                 "qty": "Qty",
-                "ppv_pct": "PPV (%)",
-                "ppv_value": "PPV Value (₹)",
+                "PPV_Pct": "PPV (%)",
+                "PPV_Value": "PPV Value (₹)",
                 "otd_rate": "OTD (%)",
                 "disc_rate": "Discrepancy (%)",
                 "late_rate": "Late payments (%)"
