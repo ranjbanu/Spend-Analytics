@@ -48,7 +48,7 @@ def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
     if d.empty:
         return pd.DataFrame(columns=[
             "Item_Category","Supplier","spend","qty","txn_count",
-            "PPV_Value","ppv_base","PPV_Pct","otd_rate","disc_rate","late_rate"
+            "PPV_Value","PPV_Base","PPV_Pct","otd_rate","disc_rate","late_rate"
         ])
 
     d = _use_negotiated(d)
@@ -68,14 +68,14 @@ def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
         qty=("Quantity","sum"),
         txn_count=("PO_ID","count"),
         PPV_Value=("PPV_Value_row","sum"),
-        ppv_base=("PPV_Base_row","sum"),
+        PPV_Base=("PPV_Base_row","sum"),
         otd_rate=("otd_bool","mean"),
         disc_rate=("Invoice_Discrepancy_Reason", lambda s: s.notna().mean()),
         late_rate=("is_late","mean")
     ).reset_index()
 
     # PPV%
-    out["PPV_Pct"] = np.where(out["ppv_base"] > 0, out["PPV_Value"] / out["ppv_base"] * 100.0, np.nan)
+    out["PPV_Pct"] = np.where(out["PPV_Base"] > 0, out["PPV_Value"] / out["PPV_Base"] * 100.0, np.nan)
 
     return out
 
@@ -89,9 +89,9 @@ def score_suppliers_rank_aggregate(kpis_df: pd.DataFrame) -> pd.DataFrame:
     cat = dfk["Item_Category"]
 
     # Rank per category for each objective
-    # Cost: lower ppv_pct, lower unfavorable ppv_value
-    dfk["unf_ppv_val"] = dfk["ppv_value"].clip(lower=0).fillna(0.0)
-    dfk["r_cost_pct"] = dfk.groupby(cat)["ppv_pct"].rank(method="min", ascending=True)  # lower is better
+    # Cost: lower PPV_Pct, lower unfavorable PPV_Value
+    dfk["unf_ppv_val"] = dfk["PPV_Value"].clip(lower=0).fillna(0.0)
+    dfk["r_cost_pct"] = dfk.groupby(cat)["PPV_Pct"].rank(method="min", ascending=True)  # lower is better
     dfk["r_cost_val"] = dfk.groupby(cat)["unf_ppv_val"].rank(method="min", ascending=True)
 
     # Reliability: higher OTD better → rank descending
