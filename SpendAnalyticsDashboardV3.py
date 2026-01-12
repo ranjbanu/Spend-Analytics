@@ -1137,7 +1137,7 @@ with tabs[2]:
     st.dataframe(recs[["Item_Category","Supplier","Supplier_Score"]].round(2), use_container_width=True)
     st.download_button(
         "Download recommendations (CSV)",
-        data=recs_view.to_csv(index=False),
+        data=recs.to_csv(index=False),
         file_name="supplier_recommendations_by_category.csv",
         mime="text/csv"
     )
