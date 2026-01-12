@@ -1148,7 +1148,7 @@ with tabs[2]:
     if not scored_rank.empty:
         cat_sel = st.selectbox(
             "Drilldown: choose a category",
-            options=sorted(scored["Item_Category"].dropna().unique().tolist())
+            options=sorted(scored_rank["Item_Category"].dropna().unique().tolist())
         )
 
         if cat_sel:
