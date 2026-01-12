@@ -79,61 +79,44 @@ def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
 
     return out
 
-def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_PPV_Pct: float = 0.7) -> pd.DataFrame:
+def score_suppliers_rank_aggregate(kpis_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Scores suppliers per category with a composite 0–100 score.
-    weights keys: {'cost','reliability','risk','volume'} in [0,1] (we’ll normalize).
-    cost_mix_PPV_Pct: share of PPV% vs PPV value in cost sub-score (default 70%).
+    Rank-aggregate suppliers per category WITHOUT weights.
+    Lower rank numbers are better for each objective.
+    Final score = sum of ranks (Borda-style), lower is better.
     """
     dfk = kpis_df.copy()
+    cat = dfk["Item_Category"]
 
-    # Prepare normalization keys
-    cat_key = dfk["Item_Category"]
+    # Rank per category for each objective
+    # Cost: lower ppv_pct, lower unfavorable ppv_value
+    dfk["unf_ppv_val"] = dfk["ppv_value"].clip(lower=0).fillna(0.0)
+    dfk["r_cost_pct"] = dfk.groupby(cat)["ppv_pct"].rank(method="min", ascending=True)  # lower is better
+    dfk["r_cost_val"] = dfk.groupby(cat)["unf_ppv_val"].rank(method="min", ascending=True)
 
-    # --- Cost sub-score ---
-    # Normalize PPV% within category (lower is better → invert)
-    PPV_Pct_norm = _minmax_by_category(dfk["PPV_Pct"].fillna(0.0), cat_key)
-    cost_PPV_Pct_score = 1.0 - PPV_Pct_norm
+    # Reliability: higher OTD better → rank descending
+    dfk["r_rel"] = dfk.groupby(cat)["otd_rate"].rank(method="min", ascending=False)
 
-    # Penalize only unfavorable PPV value (positive PPV_Value) → normalize
-    unf_ppv_val = dfk["PPV_Value"].clip(lower=0)  # negatives (favorable) become 0
-    unf_ppv_val_norm = _minmax_by_category(unf_ppv_val.fillna(0.0), cat_key)
-    cost_ppv_val_score = 1.0 - unf_ppv_val_norm
-
-    dfk["cost_score"] = cost_mix_PPV_Pct * cost_PPV_Pct_score + (1.0 - cost_mix_PPV_Pct) * cost_ppv_val_score
-
-    # --- Reliability sub-score ---
-    rel_norm = _minmax_by_category(dfk["otd_rate"].fillna(0.0), cat_key)
-    dfk["reliability_score"] = rel_norm  # higher OTD is better
-
-    # --- Risk sub-score ---
-    # Composite risk = 0.5 * discrepancy + 0.5 * late
+    # Risk: lower better → composite of discrepancy & late
     risk_raw = 0.5 * dfk["disc_rate"].fillna(0.0) + 0.5 * dfk["late_rate"].fillna(0.0)
-    risk_norm = _minmax_by_category(risk_raw, cat_key)
-    dfk["risk_score"] = 1.0 - risk_norm  # lower risk better
+    dfk["r_risk"] = dfk.groupby(cat)[risk_raw].rank(method="min", ascending=True)
 
-    # --- Volume sub-score ---
-    # Combine spend & qty (equal weight), then normalize within category
+    # Volume: larger better (spend+qty)
     vol_raw = 0.5 * dfk["spend"].fillna(0.0) + 0.5 * dfk["qty"].fillna(0.0)
-    vol_norm = _minmax_by_category(vol_raw, cat_key)
-    dfk["volume_score"] = vol_norm  # larger volume → better fit/capacity
+    dfk["r_vol"] = dfk.groupby(cat)[vol_raw].rank(method="min", ascending=False)
 
-    # Normalize weights to sum 1
-    w_cost = float(weights.get("cost", 0.4))
-    w_rel  = float(weights.get("reliability", 0.3))
-    w_risk = float(weights.get("risk", 0.2))
-    w_vol  = float(weights.get("volume", 0.1))
-    w_sum = max(w_cost + w_rel + w_risk + w_vol, 1e-6)
-    w_cost, w_rel, w_risk, w_vol = (w_cost/w_sum, w_rel/w_sum, w_risk/w_sum, w_vol/w_sum)
+    # Final rank score (sum of ranks)
+    dfk["rank_sum"] = (dfk["r_cost_pct"] + dfk["r_cost_val"] + dfk["r_rel"] + dfk["r_risk"] + dfk["r_vol"])
 
-    # Final composite score (0–100)
-    dfk["score_0_1"] = (
-        w_cost * dfk["cost_score"] +
-        w_rel  * dfk["reliability_score"] +
-        w_risk * dfk["risk_score"] +
-        w_vol  * dfk["volume_score"]
-    )
-    dfk["Supplier_Score"] = (dfk["score_0_1"] * 100.0).round(2)
+    # Convert to 0–100 score (invert rank to score)
+    # Normalize within category: max rank gets low score, min rank gets high score
+    gmin = dfk.groupby(cat)["rank_sum"].transform("min")
+    gmax = dfk.groupby(cat)["rank_sum"].transform("max")
+    rng = gmax - gmin
+    dfk["Supplier_Score"] = ((gmax - dfk["rank_sum"]) / rng).where(rng > 0, 0.5) * 100.0
+    dfk["Supplier_Score"] = dfk["Supplier_Score"].round(2)
+
+    return dfk
 
     # Reason codes (brief)
     def _reason(row):
@@ -1098,45 +1081,15 @@ with tabs[2]:
     d_in = filtered.copy()
 
     # --- Compute KPIs & score ---
-    kpis = compute_supplier_kpis(d_in)
-    scored = score_suppliers(kpis, weights, cost_mix_PPV_Pct=cost_mix_PPV_Pct/100.0)
-
-    # --- Recommendation per category (top by Supplier_Score) ---
-    st.subheader("Recommended Supplier per Category")
-    recs = (
-        scored.sort_values(["Item_Category","Supplier_Score"], ascending=[True, False])
-              .groupby("Item_Category")
-              .head(1)
-              .copy()
-    )
-
-    # Pretty columns & rounding
-    show_cols = [
-        "Item_Category","Supplier","Supplier_Score",
-        "spend","qty","txn_count","PPV_Pct","PPV_Value","otd_rate","disc_rate","late_rate","Rationale"
-    ]
-    recs_view = recs[show_cols].copy()
-    recs_view["Supplier_Score"] = recs_view["Supplier_Score"].round(2)
-    recs_view["spend"] = recs_view["spend"].round(2)
-    recs_view["qty"] = recs_view["qty"].round(2)
-    recs_view["PPV_Pct"] = recs_view["PPV_Pct"].round(2)
-    recs_view["PPV_Value"] = recs_view["PPV_Value"].round(2)
-    recs_view["otd_rate"] = (recs_view["otd_rate"]*100.0).round(1)
-    recs_view["disc_rate"] = (recs_view["disc_rate"]*100.0).round(1)
-    recs_view["late_rate"] = (recs_view["late_rate"]*100.0).round(1)
-    recs_view = recs_view.rename(columns={
-        "Supplier_Score": "Score (0–100)",
-        "spend": "Spend (₹)",
-        "qty": "Qty",
-        "PPV_Pct": "PPV (%)",
-        "PPV_Value": "PPV Value (₹)",
-        "otd_rate": "OTD (%)",
-        "disc_rate": "Discrepancy (%)",
-        "late_rate": "Late payments (%)"
-    })
-
-    st.dataframe(recs_view, use_container_width=True)
-
+    
+    kpis = compute_supplier_kpis(filtered)
+    scored_rank = score_suppliers_rank_aggregate(kpis)
+    
+    recs = (scored_rank.sort_values(["Item_Category","Supplier_Score"], ascending=[True, False])
+                       .groupby("Item_Category").head(1))
+    
+    st.subheader("Recommended Supplier per Category (Rank Aggregation)")
+    st.dataframe(recs[["Item_Category","Supplier","Supplier_Score","Rationale"]].round(2), use_container_width=True)
     st.download_button(
         "Download recommendations (CSV)",
         data=recs_view.to_csv(index=False),
@@ -1161,11 +1114,8 @@ with tabs[2]:
             import plotly.graph_objects as go
             fig = go.Figure(go.Bar(
                 x=drill["Supplier"],
-                y=drill["Supplier_Score"],
-                text=[f"OTD {r*100:.1f}% | PPV {p:.2f}%" if pd.notna(p) else f"OTD {r*100:.1f}%"
-                      for r, p in zip(drill["otd_rate"], drill["PPV_Pct"])],
-                textposition="auto"
-            ))
+                y=drill["Supplier_Score"]
+           ))
             fig.update_layout(yaxis_title="Score (0–100)", xaxis_title="")
             st.plotly_chart(fig, use_container_width=True)
 
