@@ -79,57 +79,116 @@ def compute_supplier_kpis(d: pd.DataFrame) -> pd.DataFrame:
 
     return out
 
+
 def score_suppliers_rank_aggregate(kpis_df: pd.DataFrame) -> pd.DataFrame:
     """
     Rank-aggregate suppliers per category WITHOUT weights.
     Lower rank numbers are better for each objective.
     Final score = sum of ranks (Borda-style), lower is better.
+    Converts rank to a 0–100 Supplier_Score per category.
+    Adds a readable 'Rationale' per supplier.
     """
     dfk = kpis_df.copy()
+
+    # Ensure required columns exist; fill neutrals if missing
+    for col in ["ppv_pct", "ppv_value", "otd_rate", "disc_rate", "late_rate", "spend", "qty"]:
+        if col not in dfk.columns:
+            dfk[col] = np.nan
+
+    # Group key
     cat = dfk["Item_Category"]
 
-    # Rank per category for each objective
-    # Cost: lower PPV_Pct, lower unfavorable PPV_Value
-    dfk["unf_ppv_val"] = dfk["PPV_Value"].clip(lower=0).fillna(0.0)
-    dfk["r_cost_pct"] = dfk.groupby(cat)["PPV_Pct"].rank(method="min", ascending=True)  # lower is better
-    dfk["r_cost_val"] = dfk.groupby(cat)["unf_ppv_val"].rank(method="min", ascending=True)
+    # Unfavorable PPV value only (positives)
+    dfk["unf_ppv_val"] = dfk["ppv_value"].clip(lower=0).fillna(0.0)
+
+    # ---- Rank each objective per category ----
+    # Cost ranks: lower ppv_pct, lower unfavorable ppv_value are better
+    dfk["r_cost_pct"] = dfk["ppv_pct"].fillna(0.0).groupby(cat).rank(method="min", ascending=True)
+    dfk["r_cost_val"] = dfk["unf_ppv_val"].groupby(cat).rank(method="min", ascending=True)
 
     # Reliability: higher OTD better → rank descending
-    dfk["r_rel"] = dfk.groupby(cat)["otd_rate"].rank(method="min", ascending=False)
+    dfk["r_rel"] = dfk["otd_rate"].fillna(0.0).groupby(cat).rank(method="min", ascending=False)
 
     # Risk: lower better → composite of discrepancy & late
-    risk_raw = 0.5 * dfk["disc_rate"].fillna(0.0) + 0.5 * dfk["late_rate"].fillna(0.0)
+    risk_raw = (0.5 * dfk["disc_rate"].fillna(0.0) + 0.5 * dfk["late_rate"].fillna(0.0))
     dfk["r_risk"] = risk_raw.groupby(cat).rank(method="min", ascending=True)
 
-    # Volume: larger better (spend+qty)
-    vol_raw = 0.5 * dfk["spend"].fillna(0.0) + 0.5 * dfk["qty"].fillna(0.0)
+    # Volume: larger better (spend + qty)
+    vol_raw = (0.5 * dfk["spend"].fillna(0.0) + 0.5 * dfk["qty"].fillna(0.0))
     dfk["r_vol"] = vol_raw.groupby(cat).rank(method="min", ascending=False)
 
-    # Final rank score (sum of ranks)
-    dfk["rank_sum"] = (dfk["r_cost_pct"] + dfk["r_cost_val"] + dfk["r_rel"] + dfk["r_risk"] + dfk["r_vol"])
+    # ---- Final rank score (sum of ranks) ----
+    dfk["rank_sum"] = (dfk[["r_cost_pct","r_cost_val","r_rel","r_risk","r_vol"]].sum(axis=1))
 
-    # Convert to 0–100 score (invert rank to score)
-    # Normalize within category: max rank gets low score, min rank gets high score
-    gmin = dfk.groupby(cat)["rank_sum"].transform("min")
-    gmax = dfk.groupby(cat)["rank_sum"].transform("max")
+    # Convert rank_sum to 0–100 Supplier_Score per category
+    gmin = dfk["rank_sum"].groupby(cat).transform("min")
+    gmax = dfk["rank_sum"].groupby(cat).transform("max")
     rng = gmax - gmin
     dfk["Supplier_Score"] = ((gmax - dfk["rank_sum"]) / rng).where(rng > 0, 0.5) * 100.0
     dfk["Supplier_Score"] = dfk["Supplier_Score"].round(2)
 
+    # --------------------------
+    # Add human-readable Rationale
+    # --------------------------
+    # Thresholds (tune as needed)
+    OTD_HIGH = 0.80      # 80% or higher on-time considered high
+    RISK_LOW = 0.10      # <=10% combined discrepancy+late considered low risk
+    VOL_STRONG_Q = 0.75  # top quartile by volume (spend+qty) within category
+    PPV_FAV_PCT = 0.00   # <=0% PPV considered favorable (at/under negotiated)
+
+    # Pre-compute per-row signals
+    dfk["otd_pct"] = (dfk["otd_rate"] * 100.0).round(1)
+
+    # Combined risk level (0..1)
+    dfk["risk_combined"] = (0.5 * dfk["disc_rate"].fillna(0.0) + 0.5 * dfk["late_rate"].fillna(0.0))
+
+    # Favorable PPV (at/under negotiated OR non-positive PPV Value)
+    dfk["ppv_favorable"] = ((dfk["ppv_pct"] <= PPV_FAV_PCT) | (dfk["ppv_value"] <= 0)).astype(bool)
+
+    # Volume quartiles per category using vol_raw
+    dfk["vol_raw"] = vol_raw
+    # rank high volume as small number (best), then convert to percentile 0..1 (1=highest)
+    vol_rank = dfk["vol_raw"].groupby(cat).rank(method="min", ascending=False)
+    vol_count = dfk.groupby(cat)["vol_raw"].transform("count").clip(lower=1)
+    dfk["vol_percentile"] = ((vol_count - vol_rank) / (vol_count - 1)).where((vol_count - 1) > 0, 0.5)
+
+    def _rationale(row):
+        parts = []
+        # Cost
+        if row["ppv_favorable"]:
+            parts.append("Low unfavorable PPV")
+        else:
+            parts.append("PPV above negotiated on average")
+        # Reliability
+        if pd.notna(row["otd_rate"]):
+            if row["otd_rate"] >= OTD_HIGH:
+                parts.append(f"High OTD ({row['otd_pct']}%)")
+            else:
+                parts.append(f"Moderate OTD ({row['otd_pct']}%)")
+        # Risk
+        rc = row["risk_combined"]
+        if pd.notna(rc):
+            if rc <= RISK_LOW:
+                parts.append("Low discrepancy/late risk")
+            elif rc <= 0.25:
+                parts.append("Moderate discrepancy/late risk")
+            else:
+                parts.append("Elevated discrepancy/late risk")
+        # Volume
+        vp = row["vol_percentile"]
+        if pd.notna(vp):
+            if vp >= VOL_STRONG_Q:
+                parts.append("Strong volume fit")
+            elif vp >= 0.4:
+                parts.append("Adequate volume fit")
+            else:
+                parts.append("Limited volume fit")
+        return "; ".join(parts)
+
+    dfk["Rationale"] = dfk.apply(_rationale, axis=1)
+
     return dfk
 
-    # Reason codes (brief)
-    def _reason(row):
-        reasons = []
-        if row["cost_score"] >= 0.7: reasons.append("Low unfavorable PPV")
-        if row["reliability_score"] >= 0.7: reasons.append(f"High OTD ({row['otd_rate']*100:.1f}%)")
-        if row["risk_score"] >= 0.7: reasons.append("Low discrepancy/late risk")
-        if row["volume_score"] >= 0.7: reasons.append(f"Strong volume fit (₹{row['spend']:,.0f}, qty {row['qty']:.0f})")
-        return "; ".join(reasons) if reasons else "Balanced performance"
-
-    dfk["Rationale"] = dfk.apply(_reason, axis=1)
-
-    return dfk
 
 # =========================
 # Time-series: SARIMA forecast by category (simplified, no Holt-Winters)
