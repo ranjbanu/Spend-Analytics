@@ -15,7 +15,7 @@ import numpy as np
 def _use_negotiated(df_in: pd.DataFrame) -> pd.DataFrame:
     d = df_in.copy()
     if "Negotiated_Price" in d.columns:
-        d["neg_used"] = d["Negotiated_Price"])
+        d["neg_used"] = d["Negotiated_Price"]
     return d
 
 def _minmax_by_category(series: pd.Series, by_key: pd.Series) -> pd.Series:
