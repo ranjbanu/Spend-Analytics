@@ -145,7 +145,6 @@ def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_ppv_pct: floa
     dfk["Rationale"] = dfk.apply(_reason, axis=1)
 
     return dfk
-``
 
 # =========================
 # Time-series: SARIMA forecast by category (simplified, no Holt-Winters)
