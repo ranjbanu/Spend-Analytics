@@ -1061,21 +1061,7 @@ with tabs[1]:
 
 with tabs[2]:
     st.header("🤝 Supplier Optimization")
-    st.caption("Recommend the best supplier per category using cost, reliability, risk, and volume fit. Weights are tunable.")
-
-    # --- Inputs ---
-    wcost = st.slider("Weight: Cost (PPV)", 0, 100, 40, step=5)
-    wrel  = st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
-    wrisk = st.slider("Weight: Risk (discrepancy & late)", 0, 100, 20, step=5)
-    wvol  = st.slider("Weight: Volume fit (spend & qty)", 0, 100, 10, step=5)
-    cost_mix_PPV_Pct = st.slider("Cost mix: PPV% vs PPV value (PPV% weight)", 0, 100, 70, step=5)
-
-    weights = {
-        "cost": wcost/100.0,
-        "reliability": wrel/100.0,
-        "risk": wrisk/100.0,
-        "volume": wvol/100.0
-    }
+    st.caption("Recommend the best supplier per category using cost, reliability, risk, and volume fit.")
 
     # Data slice: use CURRENT filtered selection
     d_in = filtered.copy()
