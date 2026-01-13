@@ -736,299 +736,299 @@ with tabs[0]:
     import re
     import plotly.express as px
 
-        st.header("💰 Savings & Working Capital")
-        st.caption("Compute Cost Reduction, Cost Avoidance, and Working Capital metrics for the selected period; optionally compare to the previous equal-length window.")
-    
-        # --- Helpers ---
-        def _terms_to_days(s, invoice_date, due_date):
-            """Map Payment_Terms like 'Net 30' or 'Advance' to days; fallback to due - invoice."""
-            if isinstance(s, str):
-                m = re.search(r"net\s*(\d+)", s, flags=re.IGNORECASE)
-                if m:
-                    return int(m.group(1))
-                if s.strip().lower().startswith("advance"):
-                    return 0
-            if pd.notna(due_date) and pd.notna(invoice_date):
-                return (due_date - invoice_date).days
+    st.header("💰 Savings & Working Capital")
+    st.caption("Compute Cost Reduction, Cost Avoidance, and Working Capital metrics for the selected period; optionally compare to the previous equal-length window.")
+
+    # --- Helpers ---
+    def _terms_to_days(s, invoice_date, due_date):
+        """Map Payment_Terms like 'Net 30' or 'Advance' to days; fallback to due - invoice."""
+        if isinstance(s, str):
+            m = re.search(r"net\s*(\d+)", s, flags=re.IGNORECASE)
+            if m:
+                return int(m.group(1))
+            if s.strip().lower().startswith("advance"):
+                return 0
+        if pd.notna(due_date) and pd.notna(invoice_date):
+            return (due_date - invoice_date).days
+        return np.nan
+
+    def weighted_avg(series, weights):
+        mask = series.notna() & weights.notna()
+        s = series[mask]
+        w = weights[mask]
+        if len(s) == 0 or w.sum() == 0:
             return np.nan
-    
-        def weighted_avg(series, weights):
-            mask = series.notna() & weights.notna()
-            s = series[mask]
-            w = weights[mask]
-            if len(s) == 0 or w.sum() == 0:
-                return np.nan
-            return float(np.average(s, weights=w))
-    
-        def _apply_filters_for_period(df, start_d, end_d):
-            mask = pd.Series(True, index=df.index)
-            if start_d:
-                mask &= df["Invoice_Date"].dt.date >= start_d
-            if end_d:
-                mask &= df["Invoice_Date"].dt.date <= end_d
-            # Reuse global selections from sidebar
-            if cats:
-                mask &= df["Item_Category"].isin(cats)
-            if sups:
-                mask &= df["Supplier"].isin(sups)
-            if not inc_cancelled:
-                mask &= ~df["is_cancelled"]
-            if only_addressable:
-                mask &= df["is_addressable"]
-            if only_maverick:
-                mask &= df["is_maverick"]
-            return df[mask].copy()
-    
-        def _compute_metrics(df_slice, start_d, end_d):
-            d = df_slice.copy()
-            if d.empty:
-                return {
-                    "CR": 0.0, "CA": 0.0, "DPO_actual": np.nan, "DPO_target": np.nan,
-                    "AP_float": 0.0, "spend": 0.0, "days": 1, "spend_per_day": 0.0,
-                    "CR_by_cat": pd.DataFrame(columns=["Item_Category","CR_Value"]),
-                    "CR_by_sup": pd.DataFrame(columns=["Supplier","CR_Value"]),
-                    "CA_by_cat": pd.DataFrame(columns=["Item_Category","CA_Value"]),
-                    "CA_by_sup": pd.DataFrame(columns=["Supplier","CA_Value"]),
-                    "monthly_dpo": pd.DataFrame(columns=["month","weighted_dpo"]) }
-    
-            # Savings
-            
-            d["cr_value"] = np.where(
-                d["Unit_Price"].notna() & d["Negotiated_Price"].notna() &
-                (d["Unit_Price"] < d["Negotiated_Price"]) &
-                d["Quantity"].notna() & (d["Quantity"] > 0),
-                round((d["Negotiated_Price"] - d["Unit_Price"]) * d["Quantity"],2),
-                0.0
-            )
-            
-            d["ca_value"] = np.where(
-                d["Projected_Price"].notna() & d["Negotiated_Price"].notna() &
-                (d["Projected_Price"] > d["Negotiated_Price"]) &
-                d["Unit_Price"].notna() & (d["Unit_Price"] <= d["Negotiated_Price"]) &
-                d["Quantity"].notna() & (d["Quantity"] > 0),
-                round((d["Projected_Price"] - d["Negotiated_Price"]) * d["Quantity"],2),
-                0.0
-            )
-    
-    
-            # Working capital
-            d["terms_days"] = d.apply(lambda r: _terms_to_days(r.get("Payment_Terms"), r.get("Invoice_Date"), r.get("Invoice_Due_Date")), axis=1)
-            d["dpo_actual"] = (d["Payment_Date"] - d["Invoice_Date"]).dt.days
-            d["dpo_target"] = (d["Invoice_Due_Date"] - d["Invoice_Date"]).dt.days
-            wa_dpo_actual = weighted_avg(d["dpo_actual"], d["Invoice_Amount"]) 
-            wa_dpo_target = weighted_avg(d["dpo_target"], d["Invoice_Amount"]) 
-    
-            # Spend/day & AP float
-            days_in_period = max((end_d - start_d).days, 1)
-            spend_selected = float(d["Invoice_Amount"].sum())
-            spend_per_day = spend_selected / days_in_period
-            ap_float = spend_per_day * (wa_dpo_actual if pd.notna(wa_dpo_actual) else 0)
-    
-            # Aggregations
-            cr_cat = d.groupby("Item_Category", dropna=False)["cr_value"].sum().sort_values(ascending=False)
-            cr_sup = d.groupby("Supplier", dropna=False)["cr_value"].sum().sort_values(ascending=False)
-            ca_cat = d.groupby("Item_Category", dropna=False)["ca_value"].sum().sort_values(ascending=False)
-            ca_sup = d.groupby("Supplier", dropna=False)["ca_value"].sum().sort_values(ascending=False)
-    
-            # Monthly weighted DPO
-            d["month"] = d["Invoice_Date"].dt.to_period("M").astype(str)
-            def wavg_group(g):
-                return weighted_avg(g["dpo_actual"], g["Invoice_Amount"]) 
-            monthly_dpo = d.groupby("month").apply(wavg_group).rename("weighted_dpo").reset_index()
-        
+        return float(np.average(s, weights=w))
+
+    def _apply_filters_for_period(df, start_d, end_d):
+        mask = pd.Series(True, index=df.index)
+        if start_d:
+            mask &= df["Invoice_Date"].dt.date >= start_d
+        if end_d:
+            mask &= df["Invoice_Date"].dt.date <= end_d
+        # Reuse global selections from sidebar
+        if cats:
+            mask &= df["Item_Category"].isin(cats)
+        if sups:
+            mask &= df["Supplier"].isin(sups)
+        if not inc_cancelled:
+            mask &= ~df["is_cancelled"]
+        if only_addressable:
+            mask &= df["is_addressable"]
+        if only_maverick:
+            mask &= df["is_maverick"]
+        return df[mask].copy()
+
+    def _compute_metrics(df_slice, start_d, end_d):
+        d = df_slice.copy()
+        if d.empty:
             return {
-                "CR": round(float(d["cr_value"].sum()),2),
-                "CA": round(float(d["ca_value"].sum()),2),
-                "DPO_actual": wa_dpo_actual, "DPO_target": wa_dpo_target,
-                "AP_float": float(ap_float), "spend": spend_selected,
-                "days": days_in_period, "spend_per_day": float(spend_per_day),
-                "CR_by_cat": cr_cat.reset_index().rename(columns={"cr_value":"CR_Value"}),
-                "CR_by_sup": cr_sup.reset_index().rename(columns={"cr_value":"CR_Value"}),
-                "CA_by_cat": ca_cat.reset_index().rename(columns={"ca_value":"CA_Value"}),
-                "CA_by_sup": ca_sup.reset_index().rename(columns={"ca_value":"CA_Value"}),
-                "monthly_dpo": monthly_dpo }
-    
-        # --- Inputs (use current sidebar period; add compare toggle here) ---
-        compare_prev = st.checkbox("Compare to previous period", value=True)
-        # Pull current period from existing sidebar control
-        if isinstance(period, tuple):
-            start_d, end_d = period
-            if isinstance(start_d, pd.Timestamp): start_d = start_d.date()
-            if isinstance(end_d, pd.Timestamp): end_d = end_d.date()
-        else:
-            start_d, end_d = period, date.today()
-    
-        # Current slice
-        current_df = _apply_filters_for_period(base_df, start_d, end_d)
-        current = _compute_metrics(current_df, start_d, end_d)
+                "CR": 0.0, "CA": 0.0, "DPO_actual": np.nan, "DPO_target": np.nan,
+                "AP_float": 0.0, "spend": 0.0, "days": 1, "spend_per_day": 0.0,
+                "CR_by_cat": pd.DataFrame(columns=["Item_Category","CR_Value"]),
+                "CR_by_sup": pd.DataFrame(columns=["Supplier","CR_Value"]),
+                "CA_by_cat": pd.DataFrame(columns=["Item_Category","CA_Value"]),
+                "CA_by_sup": pd.DataFrame(columns=["Supplier","CA_Value"]),
+                "monthly_dpo": pd.DataFrame(columns=["month","weighted_dpo"]) }
+
+        # Savings
         
-    
-        # Previous slice
-        previous = None
-        prev_start = prev_end = None
-        if compare_prev:
-            prev_end = start_d - timedelta(days=1)
-            prev_start = prev_end - (end_d - start_d)
-            previous_df = _apply_filters_for_period(base_df, prev_start, prev_end)
-            previous = _compute_metrics(previous_df, prev_start, prev_end)
-    
-        st.caption(f"Current period: **{start_d} → {end_d}**" + (f"  |  Previous: **{prev_start} → {prev_end}**" if compare_prev else ""))
-    
-        # KPI row with deltas
-        k1, k2, k3, k4 = st.columns(4)
-        def _delta(curr, prev):
-            return None if prev is None or prev != prev else curr - prev
-    
-        if compare_prev and previous is not None:
-            k1.metric("Cost Reduction (₹)", fmt_inr(current["CR"]), fmt_inr(_delta(current["CR"], previous["CR"])) )
-            k2.metric("Cost Avoidance (₹)", fmt_inr(current["CA"]), fmt_inr(_delta(current["CA"], previous["CA"])) )
-            dpo_delta = None if (previous["DPO_actual"] != previous["DPO_actual"]) or (current["DPO_actual"] != current["DPO_actual"]) else (current["DPO_actual"] - previous["DPO_actual"]) 
-            k3.metric("Weighted DPO (days)", f"{current['DPO_actual']:.1f}" if current["DPO_actual"] == current["DPO_actual"] else "—",
-                      f"{dpo_delta:+.1f}" if dpo_delta is not None else None)
-            k4.metric("AP Float (₹)", fmt_inr(current["AP_float"]), fmt_inr(_delta(current["AP_float"], previous["AP_float"])) )
-        else:
-            k1.metric("Cost Reduction (₹)", fmt_inr(current["CR"]))
-            k2.metric("Cost Avoidance (₹)", fmt_inr(current["CA"]))
-            k3.metric("Weighted DPO (days)", f"{current['DPO_actual']:.1f}" if current["DPO_actual"] == current["DPO_actual"] else "—")
-            k4.metric("AP Float (₹)", fmt_inr(current["AP_float"]))
-    
-        st.divider()
-    
-        cr_cat_curr = current["CR_by_cat"].copy(); cr_cat_curr["Period"] = "Current"
-        if compare_prev and previous is not None:
-            cr_cat_prev = previous["CR_by_cat"].copy()
-            top_cats = cr_cat_curr["Item_Category"].tolist()
-            cr_cat_prev = cr_cat_prev[cr_cat_prev["Item_Category"].isin(top_cats)]; cr_cat_prev["Period"] = "Previous"
-            cr_cat_plot = pd.concat([cr_cat_curr, cr_cat_prev], ignore_index=True)
-        else:
-            cr_cat_plot = cr_cat_curr
-    
-        ca_cat_curr = current["CA_by_cat"]; ca_cat_curr["Period"] = "Current"
-        if compare_prev and previous is not None:
-            ca_cat_prev = previous["CA_by_cat"].copy()
-            top_cats2 = ca_cat_curr["Item_Category"].tolist()
-            ca_cat_prev = ca_cat_prev[ca_cat_prev["Item_Category"].isin(top_cats2)]; ca_cat_prev["Period"] = "Previous"
-            ca_cat_plot = pd.concat([ca_cat_curr, ca_cat_prev], ignore_index=True)
-        else:
-            ca_cat_plot = ca_cat_curr
-    
-        col1, col2 = st.columns(2)
-        with col1:
-            st.caption("Cost Reduction (CR) by Category")
-            fig = px.bar(cr_cat_plot, x="Item_Category", y="CR_Value", color="Period", barmode="group", text="CR_Value")
-            fig.update_layout(yaxis_title="CR (₹)", xaxis_title="")
-            st.plotly_chart(fig, use_container_width=True)
-        with col2:
-            st.caption("Cost Avoidance (CA) by Category")
-            fig2 = px.bar(ca_cat_plot, x="Item_Category", y="CA_Value", color="Period", barmode="group", text="CA_Value")
-            fig2.update_layout(yaxis_title="CA (₹)", xaxis_title="")
-            st.plotly_chart(fig2, use_container_width=True)
+        d["cr_value"] = np.where(
+            d["Unit_Price"].notna() & d["Negotiated_Price"].notna() &
+            (d["Unit_Price"] < d["Negotiated_Price"]) &
+            d["Quantity"].notna() & (d["Quantity"] > 0),
+            round((d["Negotiated_Price"] - d["Unit_Price"]) * d["Quantity"],2),
+            0.0
+        )
         
-        if compare_prev and previous is not None:
-            combined_CR_df = pd.concat(
-                [current["CR_by_cat"].assign(Source="Current"),
-                 previous["CR_by_cat"].assign(Source="Previous")],
-                ignore_index=True
-            )
-            combined_CA_df = pd.concat(
-            [current["CA_by_cat"].assign(Source="Current"),
-             previous["CA_by_cat"].assign(Source="Previous")],
+        d["ca_value"] = np.where(
+            d["Projected_Price"].notna() & d["Negotiated_Price"].notna() &
+            (d["Projected_Price"] > d["Negotiated_Price"]) &
+            d["Unit_Price"].notna() & (d["Unit_Price"] <= d["Negotiated_Price"]) &
+            d["Quantity"].notna() & (d["Quantity"] > 0),
+            round((d["Projected_Price"] - d["Negotiated_Price"]) * d["Quantity"],2),
+            0.0
+        )
+
+
+        # Working capital
+        d["terms_days"] = d.apply(lambda r: _terms_to_days(r.get("Payment_Terms"), r.get("Invoice_Date"), r.get("Invoice_Due_Date")), axis=1)
+        d["dpo_actual"] = (d["Payment_Date"] - d["Invoice_Date"]).dt.days
+        d["dpo_target"] = (d["Invoice_Due_Date"] - d["Invoice_Date"]).dt.days
+        wa_dpo_actual = weighted_avg(d["dpo_actual"], d["Invoice_Amount"]) 
+        wa_dpo_target = weighted_avg(d["dpo_target"], d["Invoice_Amount"]) 
+
+        # Spend/day & AP float
+        days_in_period = max((end_d - start_d).days, 1)
+        spend_selected = float(d["Invoice_Amount"].sum())
+        spend_per_day = spend_selected / days_in_period
+        ap_float = spend_per_day * (wa_dpo_actual if pd.notna(wa_dpo_actual) else 0)
+
+        # Aggregations
+        cr_cat = d.groupby("Item_Category", dropna=False)["cr_value"].sum().sort_values(ascending=False)
+        cr_sup = d.groupby("Supplier", dropna=False)["cr_value"].sum().sort_values(ascending=False)
+        ca_cat = d.groupby("Item_Category", dropna=False)["ca_value"].sum().sort_values(ascending=False)
+        ca_sup = d.groupby("Supplier", dropna=False)["ca_value"].sum().sort_values(ascending=False)
+
+        # Monthly weighted DPO
+        d["month"] = d["Invoice_Date"].dt.to_period("M").astype(str)
+        def wavg_group(g):
+            return weighted_avg(g["dpo_actual"], g["Invoice_Amount"]) 
+        monthly_dpo = d.groupby("month").apply(wavg_group).rename("weighted_dpo").reset_index()
+    
+        return {
+            "CR": round(float(d["cr_value"].sum()),2),
+            "CA": round(float(d["ca_value"].sum()),2),
+            "DPO_actual": wa_dpo_actual, "DPO_target": wa_dpo_target,
+            "AP_float": float(ap_float), "spend": spend_selected,
+            "days": days_in_period, "spend_per_day": float(spend_per_day),
+            "CR_by_cat": cr_cat.reset_index().rename(columns={"cr_value":"CR_Value"}),
+            "CR_by_sup": cr_sup.reset_index().rename(columns={"cr_value":"CR_Value"}),
+            "CA_by_cat": ca_cat.reset_index().rename(columns={"ca_value":"CA_Value"}),
+            "CA_by_sup": ca_sup.reset_index().rename(columns={"ca_value":"CA_Value"}),
+            "monthly_dpo": monthly_dpo }
+
+    # --- Inputs (use current sidebar period; add compare toggle here) ---
+    compare_prev = st.checkbox("Compare to previous period", value=True)
+    # Pull current period from existing sidebar control
+    if isinstance(period, tuple):
+        start_d, end_d = period
+        if isinstance(start_d, pd.Timestamp): start_d = start_d.date()
+        if isinstance(end_d, pd.Timestamp): end_d = end_d.date()
+    else:
+        start_d, end_d = period, date.today()
+
+    # Current slice
+    current_df = _apply_filters_for_period(base_df, start_d, end_d)
+    current = _compute_metrics(current_df, start_d, end_d)
+    
+
+    # Previous slice
+    previous = None
+    prev_start = prev_end = None
+    if compare_prev:
+        prev_end = start_d - timedelta(days=1)
+        prev_start = prev_end - (end_d - start_d)
+        previous_df = _apply_filters_for_period(base_df, prev_start, prev_end)
+        previous = _compute_metrics(previous_df, prev_start, prev_end)
+
+    st.caption(f"Current period: **{start_d} → {end_d}**" + (f"  |  Previous: **{prev_start} → {prev_end}**" if compare_prev else ""))
+
+    # KPI row with deltas
+    k1, k2, k3, k4 = st.columns(4)
+    def _delta(curr, prev):
+        return None if prev is None or prev != prev else curr - prev
+
+    if compare_prev and previous is not None:
+        k1.metric("Cost Reduction (₹)", fmt_inr(current["CR"]), fmt_inr(_delta(current["CR"], previous["CR"])) )
+        k2.metric("Cost Avoidance (₹)", fmt_inr(current["CA"]), fmt_inr(_delta(current["CA"], previous["CA"])) )
+        dpo_delta = None if (previous["DPO_actual"] != previous["DPO_actual"]) or (current["DPO_actual"] != current["DPO_actual"]) else (current["DPO_actual"] - previous["DPO_actual"]) 
+        k3.metric("Weighted DPO (days)", f"{current['DPO_actual']:.1f}" if current["DPO_actual"] == current["DPO_actual"] else "—",
+                  f"{dpo_delta:+.1f}" if dpo_delta is not None else None)
+        k4.metric("AP Float (₹)", fmt_inr(current["AP_float"]), fmt_inr(_delta(current["AP_float"], previous["AP_float"])) )
+    else:
+        k1.metric("Cost Reduction (₹)", fmt_inr(current["CR"]))
+        k2.metric("Cost Avoidance (₹)", fmt_inr(current["CA"]))
+        k3.metric("Weighted DPO (days)", f"{current['DPO_actual']:.1f}" if current["DPO_actual"] == current["DPO_actual"] else "—")
+        k4.metric("AP Float (₹)", fmt_inr(current["AP_float"]))
+
+    st.divider()
+
+    cr_cat_curr = current["CR_by_cat"].copy(); cr_cat_curr["Period"] = "Current"
+    if compare_prev and previous is not None:
+        cr_cat_prev = previous["CR_by_cat"].copy()
+        top_cats = cr_cat_curr["Item_Category"].tolist()
+        cr_cat_prev = cr_cat_prev[cr_cat_prev["Item_Category"].isin(top_cats)]; cr_cat_prev["Period"] = "Previous"
+        cr_cat_plot = pd.concat([cr_cat_curr, cr_cat_prev], ignore_index=True)
+    else:
+        cr_cat_plot = cr_cat_curr
+
+    ca_cat_curr = current["CA_by_cat"]; ca_cat_curr["Period"] = "Current"
+    if compare_prev and previous is not None:
+        ca_cat_prev = previous["CA_by_cat"].copy()
+        top_cats2 = ca_cat_curr["Item_Category"].tolist()
+        ca_cat_prev = ca_cat_prev[ca_cat_prev["Item_Category"].isin(top_cats2)]; ca_cat_prev["Period"] = "Previous"
+        ca_cat_plot = pd.concat([ca_cat_curr, ca_cat_prev], ignore_index=True)
+    else:
+        ca_cat_plot = ca_cat_curr
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.caption("Cost Reduction (CR) by Category")
+        fig = px.bar(cr_cat_plot, x="Item_Category", y="CR_Value", color="Period", barmode="group", text="CR_Value")
+        fig.update_layout(yaxis_title="CR (₹)", xaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+    with col2:
+        st.caption("Cost Avoidance (CA) by Category")
+        fig2 = px.bar(ca_cat_plot, x="Item_Category", y="CA_Value", color="Period", barmode="group", text="CA_Value")
+        fig2.update_layout(yaxis_title="CA (₹)", xaxis_title="")
+        st.plotly_chart(fig2, use_container_width=True)
+    
+    if compare_prev and previous is not None:
+        combined_CR_df = pd.concat(
+            [current["CR_by_cat"].assign(Source="Current"),
+             previous["CR_by_cat"].assign(Source="Previous")],
             ignore_index=True
-            )
-        c_left, c_right = st.columns(2)
-        with c_left:      
-            if compare_prev and previous is not None:
-                st.download_button("Download CR by Category (Previous & Current, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
-            else:
-                st.download_button("Download CR by Category (Current, CSV)", data=current["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_current.csv", mime="text/csv")
-        with c_right:
-            if compare_prev and previous is not None:
-                st.download_button("Download CA by Category (Previous & Current, CSV)", data=combined_CA_df.to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
-            else:
-                st.download_button("Download CA by Category (Current, CSV)", data=current["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_current.csv", mime="text/csv")
-        st.divider()
-    
-        cr_sup_curr = current["CR_by_sup"].copy(); cr_sup_curr["Period"] = "Current"
+        )
+        combined_CA_df = pd.concat(
+        [current["CA_by_cat"].assign(Source="Current"),
+         previous["CA_by_cat"].assign(Source="Previous")],
+        ignore_index=True
+        )
+    c_left, c_right = st.columns(2)
+    with c_left:      
         if compare_prev and previous is not None:
-            cr_sup_prev = previous["CR_by_sup"].copy(); top_sups = cr_sup_curr["Supplier"].tolist()
-            cr_sup_prev = cr_sup_prev[cr_sup_prev["Supplier"].isin(top_sups)]; cr_sup_prev["Period"] = "Previous"
-            cr_sup_plot = pd.concat([cr_sup_curr, cr_sup_prev], ignore_index=True)
+            st.download_button("Download CR by Category (Previous & Current, CSV)", data=combined_CR_df.to_csv(index=False), file_name="cr_by_category_previous.csv", mime="text/csv")
         else:
-            cr_sup_plot = cr_sup_curr
-    
-        ca_sup_curr = current["CA_by_sup"].copy(); ca_sup_curr["Period"] = "Current"
+            st.download_button("Download CR by Category (Current, CSV)", data=current["CR_by_cat"].to_csv(index=False), file_name="cr_by_category_current.csv", mime="text/csv")
+    with c_right:
         if compare_prev and previous is not None:
-            ca_sup_prev = previous["CA_by_sup"].copy(); top_sups2 = ca_sup_curr["Supplier"].tolist()
-            ca_sup_prev = ca_sup_prev[ca_sup_prev["Supplier"].isin(top_sups2)]; ca_sup_prev["Period"] = "Previous"
-            ca_sup_plot = pd.concat([ca_sup_curr, ca_sup_prev], ignore_index=True)
+            st.download_button("Download CA by Category (Previous & Current, CSV)", data=combined_CA_df.to_csv(index=False), file_name="ca_by_category_previous.csv", mime="text/csv")
         else:
-            ca_sup_plot = ca_sup_curr
-    
-        s1, s2 = st.columns(2)
-        with s1:
-            st.caption("Cost Reduction (CR) by Supplier")
-            fig3 = px.bar(cr_sup_plot, x="Supplier", y="CR_Value", color="Period", barmode="group", text="CR_Value")
-            fig3.update_layout(yaxis_title="CR (₹)", xaxis_title="")
-            st.plotly_chart(fig3, use_container_width=True)
-        with s2:
-            st.caption("Cost Avoidance (CA) by Supplier")
-            fig4 = px.bar(ca_sup_plot, x="Supplier", y="CA_Value", color="Period", barmode="group", text="CA_Value")
-            fig4.update_layout(yaxis_title="CA (₹)", xaxis_title="")
-            st.plotly_chart(fig4, use_container_width=True)
-    
-        if compare_prev and previous is not None:
-            combined_CR_sup_df = pd.concat(
-                [current["CR_by_sup"].assign(Source="Current"),
-                 previous["CR_by_sup"].assign(Source="Previous")],
-                ignore_index=True
-            )
-            combined_CA_sup_df = pd.concat(
-            [current["CA_by_sup"].assign(Source="Current"),
-             previous["CA_by_sup"].assign(Source="Previous")],
+            st.download_button("Download CA by Category (Current, CSV)", data=current["CA_by_cat"].to_csv(index=False), file_name="ca_by_category_current.csv", mime="text/csv")
+    st.divider()
+
+    cr_sup_curr = current["CR_by_sup"].copy(); cr_sup_curr["Period"] = "Current"
+    if compare_prev and previous is not None:
+        cr_sup_prev = previous["CR_by_sup"].copy(); top_sups = cr_sup_curr["Supplier"].tolist()
+        cr_sup_prev = cr_sup_prev[cr_sup_prev["Supplier"].isin(top_sups)]; cr_sup_prev["Period"] = "Previous"
+        cr_sup_plot = pd.concat([cr_sup_curr, cr_sup_prev], ignore_index=True)
+    else:
+        cr_sup_plot = cr_sup_curr
+
+    ca_sup_curr = current["CA_by_sup"].copy(); ca_sup_curr["Period"] = "Current"
+    if compare_prev and previous is not None:
+        ca_sup_prev = previous["CA_by_sup"].copy(); top_sups2 = ca_sup_curr["Supplier"].tolist()
+        ca_sup_prev = ca_sup_prev[ca_sup_prev["Supplier"].isin(top_sups2)]; ca_sup_prev["Period"] = "Previous"
+        ca_sup_plot = pd.concat([ca_sup_curr, ca_sup_prev], ignore_index=True)
+    else:
+        ca_sup_plot = ca_sup_curr
+
+    s1, s2 = st.columns(2)
+    with s1:
+        st.caption("Cost Reduction (CR) by Supplier")
+        fig3 = px.bar(cr_sup_plot, x="Supplier", y="CR_Value", color="Period", barmode="group", text="CR_Value")
+        fig3.update_layout(yaxis_title="CR (₹)", xaxis_title="")
+        st.plotly_chart(fig3, use_container_width=True)
+    with s2:
+        st.caption("Cost Avoidance (CA) by Supplier")
+        fig4 = px.bar(ca_sup_plot, x="Supplier", y="CA_Value", color="Period", barmode="group", text="CA_Value")
+        fig4.update_layout(yaxis_title="CA (₹)", xaxis_title="")
+        st.plotly_chart(fig4, use_container_width=True)
+
+    if compare_prev and previous is not None:
+        combined_CR_sup_df = pd.concat(
+            [current["CR_by_sup"].assign(Source="Current"),
+             previous["CR_by_sup"].assign(Source="Previous")],
             ignore_index=True
-            )
-        c_left, c_right = st.columns(2)
-        with c_left:   
-            if compare_prev and previous is not None:
-                st.download_button("Download CR by Supplier (Previous, CSV)", data=combined_CR_sup_df.to_csv(index=False), file_name="cr_by_supplier_previous.csv", mime="text/csv")
-            else:
-                st.download_button("Download CR by Supplier (Current, CSV)", data=current["CR_by_sup"].to_csv(index=False), file_name="cr_by_supplier_current.csv", mime="text/csv")
-        with c_right:
-            if compare_prev and previous is not None:
-                st.download_button("Download CA by Supplier (Previous, CSV)", data=combined_CA_sup_df.to_csv(index=False), file_name="ca_by_supplier_previous.csv", mime="text/csv")
-            else:
-                st.download_button("Download CA by Supplier (Current, CSV)", data=current["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_current.csv", mime="text/csv")
-        st.divider()
-    
-        # Working Capital: Monthly DPO
-        st.subheader("Working Capital: Monthly Weighted DPO")
-        monthly_curr = current["monthly_dpo"]; monthly_curr["Period"] = "Current"
-        if compare_prev and previous is not None and not previous["monthly_dpo"].empty:
-            monthly_prev = previous["monthly_dpo"].copy(); monthly_prev["Period"] = "Previous"
-            monthly_both = pd.concat([monthly_curr, monthly_prev], ignore_index=True)
+        )
+        combined_CA_sup_df = pd.concat(
+        [current["CA_by_sup"].assign(Source="Current"),
+         previous["CA_by_sup"].assign(Source="Previous")],
+        ignore_index=True
+        )
+    c_left, c_right = st.columns(2)
+    with c_left:   
+        if compare_prev and previous is not None:
+            st.download_button("Download CR by Supplier (Previous, CSV)", data=combined_CR_sup_df.to_csv(index=False), file_name="cr_by_supplier_previous.csv", mime="text/csv")
         else:
-            monthly_both = monthly_curr
-        fig5 = px.line(monthly_both, x="month", y="weighted_dpo", color="Period", markers=True,
-                       labels={"weighted_dpo":"Weighted DPO (days)", "month":""})
-        st.plotly_chart(fig5, use_container_width=True)
-    
-        # Details table
-        st.subheader("DPO Details (Current Period)")
-        dpo_tbl = current_df[["Supplier","Invoice_Number","Invoice_Date","Invoice_Amount","Invoice_Due_Date","Payment_Date"]].copy()
-        dpo_tbl["dpo_actual"] = (dpo_tbl["Payment_Date"] - dpo_tbl["Invoice_Date"]).dt.days
-        dpo_tbl["dpo_target"] = (dpo_tbl["Invoice_Due_Date"] - dpo_tbl["Invoice_Date"]).dt.days
-        st.dataframe(dpo_tbl.sort_values("Invoice_Date", ascending=False), use_container_width=True, height=360)
-        st.download_button("Download DPO detail (Current, CSV)", data=dpo_tbl.to_csv(index=False), file_name="dpo_detail_current.csv", mime="text/csv")
-    
-        with st.expander("Definitions & Notes"):
-            st.markdown("""
-    - **Cost Reduction (CR):** Realized savings when Unit_Price < Negotiated_Price.
-    - **Cost Avoidance (CA):** Avoided price increase where Projected_Price > Negotiated_Price and actual paid ≤ Negotiated_Price.
-    - **Weighted DPO:** Weighted average of (Payment_Date − Invoice_Date) by Invoice_Amount.
-    - **AP Float (proxy):** Spend/day × Weighted DPO. Directional indicator of AP-related working capital.
-    - **Comparison window:** Previous period is equal length and ends the day before the current period starts; all other filters are identical.
-    - **Edge cases:** Missing dates and zeros are ignored in weighted calculations; results may differ slightly when data is sparse.
-            """)
+            st.download_button("Download CR by Supplier (Current, CSV)", data=current["CR_by_sup"].to_csv(index=False), file_name="cr_by_supplier_current.csv", mime="text/csv")
+    with c_right:
+        if compare_prev and previous is not None:
+            st.download_button("Download CA by Supplier (Previous, CSV)", data=combined_CA_sup_df.to_csv(index=False), file_name="ca_by_supplier_previous.csv", mime="text/csv")
+        else:
+            st.download_button("Download CA by Supplier (Current, CSV)", data=current["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_current.csv", mime="text/csv")
+    st.divider()
+
+    # Working Capital: Monthly DPO
+    st.subheader("Working Capital: Monthly Weighted DPO")
+    monthly_curr = current["monthly_dpo"]; monthly_curr["Period"] = "Current"
+    if compare_prev and previous is not None and not previous["monthly_dpo"].empty:
+        monthly_prev = previous["monthly_dpo"].copy(); monthly_prev["Period"] = "Previous"
+        monthly_both = pd.concat([monthly_curr, monthly_prev], ignore_index=True)
+    else:
+        monthly_both = monthly_curr
+    fig5 = px.line(monthly_both, x="month", y="weighted_dpo", color="Period", markers=True,
+                   labels={"weighted_dpo":"Weighted DPO (days)", "month":""})
+    st.plotly_chart(fig5, use_container_width=True)
+
+    # Details table
+    st.subheader("DPO Details (Current Period)")
+    dpo_tbl = current_df[["Supplier","Invoice_Number","Invoice_Date","Invoice_Amount","Invoice_Due_Date","Payment_Date"]].copy()
+    dpo_tbl["dpo_actual"] = (dpo_tbl["Payment_Date"] - dpo_tbl["Invoice_Date"]).dt.days
+    dpo_tbl["dpo_target"] = (dpo_tbl["Invoice_Due_Date"] - dpo_tbl["Invoice_Date"]).dt.days
+    st.dataframe(dpo_tbl.sort_values("Invoice_Date", ascending=False), use_container_width=True, height=360)
+    st.download_button("Download DPO detail (Current, CSV)", data=dpo_tbl.to_csv(index=False), file_name="dpo_detail_current.csv", mime="text/csv")
+
+    with st.expander("Definitions & Notes"):
+        st.markdown("""
+- **Cost Reduction (CR):** Realized savings when Unit_Price < Negotiated_Price.
+- **Cost Avoidance (CA):** Avoided price increase where Projected_Price > Negotiated_Price and actual paid ≤ Negotiated_Price.
+- **Weighted DPO:** Weighted average of (Payment_Date − Invoice_Date) by Invoice_Amount.
+- **AP Float (proxy):** Spend/day × Weighted DPO. Directional indicator of AP-related working capital.
+- **Comparison window:** Previous period is equal length and ends the day before the current period starts; all other filters are identical.
+- **Edge cases:** Missing dates and zeros are ignored in weighted calculations; results may differ slightly when data is sparse.
+        """)
 
 
 # =============================================================
