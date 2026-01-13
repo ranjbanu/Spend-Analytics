@@ -735,10 +735,7 @@ with tabs[0]:
     # =============================================================
     import re
     import plotly.express as px
-    
-    st.subheader("Tabs")
-    sv_tab = st.tabs(["💰 Savings & Working Capital"])[0]
-    with sv_tab:
+
         st.header("💰 Savings & Working Capital")
         st.caption("Compute Cost Reduction, Cost Avoidance, and Working Capital metrics for the selected period; optionally compare to the previous equal-length window.")
     
