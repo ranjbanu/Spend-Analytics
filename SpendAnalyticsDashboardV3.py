@@ -1085,7 +1085,7 @@ with tabs[2]:
     wrel  = 30 #st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
     wrisk = 20 #st.slider("Weight: Risk (discrepancy & late)", 0, 100, 20, step=5)
     wvol  = 10 #st.slider("Weight: Volume fit (spend & qty)", 0, 100, 10, step=5)
-    cost_mix_PPV_Pct = st.slider("Cost mix: PPV% vs PPV value (PPV% weight)", 0, 100, 70, step=5)
+    cost_mix_PPV_Pct = 70 #st.slider("Cost mix: PPV% vs PPV value (PPV% weight)", 0, 100, 70, step=5)
 
     weights = {
         "cost": wcost/100.0,
@@ -1161,7 +1161,9 @@ with tabs[2]:
             import plotly.graph_objects as go
             fig = go.Figure(go.Bar(
                 x=drill["Supplier"],
-                y=drill["Supplier_Score"]
+                y=drill["Supplier_Score"],
+                text = drill["Supplier_Score"],
+                textposition="outside"
             ))
             fig.update_layout(yaxis_title="Score (0–100)", xaxis_title="")
             st.plotly_chart(fig, use_container_width=True)
@@ -1187,12 +1189,6 @@ with tabs[2]:
                 "late_rate": "Late payments (%)"
             })
 
-            st.download_button(
-                f"Download supplier ranking for {cat_sel} (CSV)",
-                data=drill_view.to_csv(index=False),
-                file_name=f"supplier_ranking_{cat_sel}.csv",
-                mime="text/csv"
-            )
 
     with st.expander("Scoring methodology"):
         st.markdown("""
