@@ -1081,10 +1081,10 @@ with tabs[2]:
     st.caption("Recommend the best supplier per category using cost, reliability, risk, and volume fit. Weights are tunable.")
 
     # --- Inputs ---
-    wcost = st.slider("Weight: Cost (PPV)", 0, 100, 40, step=5)
-    wrel  = st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
-    wrisk = st.slider("Weight: Risk (discrepancy & late)", 0, 100, 20, step=5)
-    wvol  = st.slider("Weight: Volume fit (spend & qty)", 0, 100, 10, step=5)
+    wcost = 40 #st.slider("Weight: Cost (PPV)", 0, 100, 40, step=5)
+    wrel  = 30 #st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
+    wrisk = 20 #st.slider("Weight: Risk (discrepancy & late)", 0, 100, 20, step=5)
+    wvol  = 10 #st.slider("Weight: Volume fit (spend & qty)", 0, 100, 10, step=5)
     cost_mix_PPV_Pct = st.slider("Cost mix: PPV% vs PPV value (PPV% weight)", 0, 100, 70, step=5)
 
     weights = {
@@ -1161,10 +1161,7 @@ with tabs[2]:
             import plotly.graph_objects as go
             fig = go.Figure(go.Bar(
                 x=drill["Supplier"],
-                y=drill["Supplier_Score"],
-                text=[f"OTD {r*100:.1f}% | PPV {p:.2f}%" if pd.notna(p) else f"OTD {r*100:.1f}%"
-                      for r, p in zip(drill["otd_rate"], drill["PPV_Pct"])],
-                textposition="auto"
+                y=drill["Supplier_Score"]
             ))
             fig.update_layout(yaxis_title="Score (0–100)", xaxis_title="")
             st.plotly_chart(fig, use_container_width=True)
