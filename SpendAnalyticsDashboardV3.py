@@ -52,7 +52,7 @@ def pareto_figure_from_series(series: pd.Series, title: str, topn: int = 15):
         title=title,
         bargap=0.2,
         template="plotly_white",
-        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0),
+        legend=dict(orientation="h", yanchor="bottom", y=0.98, xanchor="left", x=0),
         margin=dict(l=10, r=10, t=60, b=10),
         xaxis=dict(title="", tickangle=-45, showgrid=False),
         yaxis=dict(title="Value", rangemode="tozero", showgrid=True),
