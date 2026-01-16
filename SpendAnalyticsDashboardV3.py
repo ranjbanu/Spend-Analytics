@@ -1133,7 +1133,6 @@ with tabs[1]:
     - **Model:** SARIMA chosen via a small AIC grid. If the category history is too short or the fit fails, we use **Seasonal-Naive**.
     - **Confidence intervals:** 80% and 95% from SARIMA; for the fallback we estimate bands using residual volatility vs seasonal lag.
     - **Rounding:** All values are rounded to **2 decimals**.
-    - **Tip:** Prefer **Full dataset** for training to learn seasonality robustly; filtered slices are great for scenario-specific views.
     """)
 
 with tabs[2]:
