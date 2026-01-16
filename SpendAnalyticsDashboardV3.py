@@ -568,13 +568,13 @@ with tabs[0]:
     with left:
         st.caption("Top Categories by Spend (Pareto)")
         by_cat = filtered.groupby("Item_Category")["Invoice_Amount"].sum()
-        fig_cat_pareto = pareto_figure_from_series(by_cat, title="Pareto: Spend by Category", topn=15)
+        fig_cat_pareto = pareto_figure_from_series(by_cat, title="Pareto: Spend by Category", topn=10)
         st.plotly_chart(fig_cat_pareto, use_container_width=True)
     
     with right:
         st.caption("Top Suppliers by Spend (Pareto)")
         by_sup = filtered.groupby("Supplier")["Invoice_Amount"].sum()
-        fig_sup_pareto = pareto_figure_from_series(by_sup, title="Pareto: Spend by Supplier", topn=15)
+        fig_sup_pareto = pareto_figure_from_series(by_sup, title="Pareto: Spend by Supplier", topn=10)
         st.plotly_chart(fig_sup_pareto, use_container_width=True)
     
     # ---------------------------
