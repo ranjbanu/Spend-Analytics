@@ -28,7 +28,6 @@ def pareto_figure_from_series(series: pd.Series, title: str, topn: int = 15):
         go.Bar(
             x=dfp["label"],
             y=dfp["value"],
-            name="Value",
             marker_color="#1f77b4",
             yaxis="y1",
             hovertemplate="<b>%{x}</b><br>Value: %{y:,.0f}<extra></extra>",
@@ -40,7 +39,6 @@ def pareto_figure_from_series(series: pd.Series, title: str, topn: int = 15):
         go.Scatter(
             x=dfp["label"],
             y=dfp["cum_pct"],
-            name="Cumulative %",
             mode="lines+markers",
             line=dict(color="#d62728", width=2),
             marker=dict(size=7, color="#d62728"),
