@@ -6,6 +6,70 @@ import numpy as np
 from datetime import datetime, date, timedelta
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
+import plotly.graph_objects as go
+
+def pareto_figure_from_series(series: pd.Series, title: str, topn: int = 15):
+    """
+    Build a Pareto chart: bars = value (left axis), line = cumulative % (right axis).
+    'series' should be a 1-D series indexed by category/supplier with numeric values.
+    """
+    s = series.dropna().groupby(level=0).sum() if isinstance(series.index, pd.MultiIndex) else series.dropna()
+    s = s.sort_values(ascending=False).head(topn)
+
+    dfp = pd.DataFrame({"label": s.index.astype(str), "value": s.values})
+    dfp["cum_value"] = dfp["value"].cumsum()
+    total = dfp["value"].sum()
+    dfp["cum_pct"] = (dfp["cum_value"] / total) * 100.0 if total != 0 else 0.0
+
+    fig = go.Figure()
+
+    # Bars (left axis)
+    fig.add_trace(
+        go.Bar(
+            x=dfp["label"],
+            y=dfp["value"],
+            name="Value",
+            marker_color="#1f77b4",
+            yaxis="y1",
+            hovertemplate="<b>%{x}</b><br>Value: %{y:,.0f}<extra></extra>",
+        )
+    )
+
+    # Cumulative % (right axis)
+    fig.add_trace(
+        go.Scatter(
+            x=dfp["label"],
+            y=dfp["cum_pct"],
+            name="Cumulative %",
+            mode="lines+markers",
+            line=dict(color="#d62728", width=2),
+            marker=dict(size=7, color="#d62728"),
+            yaxis="y2",
+            hovertemplate="<b>%{x}</b><br>Cum %: %{y:.1f}%<extra></extra>",
+        )
+    )
+
+    # Layout: dual axes + 80% rule (optional)
+    fig.update_layout(
+        title=title,
+        bargap=0.2,
+        template="plotly_white",
+        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0),
+        margin=dict(l=10, r=10, t=60, b=10),
+        xaxis=dict(title="", tickangle=0, showgrid=False),
+        yaxis=dict(title="Value", rangemode="tozero", showgrid=True),
+        yaxis2=dict(title="Cumulative %", overlaying="y", side="right", range=[0, 100], showgrid=False),
+        height=480,
+    )
+
+    # Add horizontal 80% reference line
+    fig.add_hline(
+        y=80, line_dash="dash", line_color="gray",
+        annotation_text="80%", annotation_position="top left", secondary_y=True
+    )
+
+    return fig
+
 
 # ---------- Supplier Optimization: KPIs + Scoring ----------
 
@@ -502,17 +566,18 @@ with tabs[0]:
         s = s.sort_values(ascending=False).head(topn)
         return s
     
+
     with left:
-        st.caption("Top Categories by Spend")
-        by_cat = (filtered.groupby("Item_Category")["Invoice_Amount"]
-                  .sum().sort_values(ascending=False).head(15))
-        st.bar_chart(by_cat, use_container_width=True)
+        st.caption("Top Categories by Spend (Pareto)")
+        by_cat = filtered.groupby("Item_Category")["Invoice_Amount"].sum()
+        fig_cat_pareto = pareto_figure_from_series(by_cat, title="Pareto: Spend by Category", topn=15)
+        st.plotly_chart(fig_cat_pareto, use_container_width=True)
     
     with right:
-        st.caption("Top Suppliers by Spend")
-        by_sup = (filtered.groupby("Supplier")["Invoice_Amount"]
-                  .sum().sort_values(ascending=False).head(15))
-        st.bar_chart(by_sup, use_container_width=True)
+        st.caption("Top Suppliers by Spend (Pareto)")
+        by_sup = filtered.groupby("Supplier")["Invoice_Amount"].sum()
+        fig_sup_pareto = pareto_figure_from_series(by_sup, title="Pareto: Spend by Supplier", topn=15)
+        st.plotly_chart(fig_sup_pareto, use_container_width=True)
     
     # ---------------------------
     # Trend: monthly spend + maverick share
