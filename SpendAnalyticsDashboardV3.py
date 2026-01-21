@@ -1394,7 +1394,7 @@ with tabs[3]:
     st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
     
     prod = st.text_input("Product name (Item_Description)")
-    sup = st.selectbox("Supplier", options=sorted(base_df["Supplier"].dropna().unique())
+    sup = st.selectbox("Supplier", options=sorted(base_df["Supplier"].dropna().unique()))
 
     model = fit_memory(base_df)
     predict(model, prod, sup, top_k=20)
