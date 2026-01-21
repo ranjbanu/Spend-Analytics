@@ -5,8 +5,136 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, date, timedelta
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 
 import plotly.graph_objects as go
+import os
+import re
+import json
+
+def _clean_text(s: str) -> str:
+    if not isinstance(s, str):
+        return ""
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9 &/_\-]+", " ", s)  # keep common separators
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def fit_memory(df: pd.DataFrame):
+    """
+    Prepare the in-memory structures used for fast nearest-neighbour classification.
+    Returns a dict with everything needed by predict().
+    """
+    d = df.copy()
+
+    # Keep only rows with known categories
+    d = d[(d["Item_Category"].notna()) & (d["Spend_Category"].notna())].copy()
+
+    # Basic fallbacks by supplier frequency
+    sup_mode_item = (
+        d.groupby("Supplier")["Item_Category"]
+        .agg(lambda s: s.value_counts(dropna=True).index[0])
+        .to_dict()
+    )
+    sup_mode_spend = (
+        d.groupby("Supplier")["Spend_Category"]
+        .agg(lambda s: s.value_counts(dropna=True).index[0])
+        .to_dict()
+    )
+
+    text = _build_text_column(d)
+
+    model = {
+        "df": d,
+        "sup_mode_item": sup_mode_item,
+        "sup_mode_spend": sup_mode_spend,
+        "vectorizer": None,
+        "X": None,
+    }
+
+    if len(d) > 0:
+        vect = TfidfVectorizer(min_df=1, ngram_range=(1, 2))  # unigrams+bigrams
+        X = vect.fit_transform(text.values)
+        model["vectorizer"] = vect
+        model["X"] = X
+
+    return model
+
+def _weighted_majority(labels: np.ndarray, weights: np.ndarray):
+    # Return label with max total weight (ties broken by overall frequency)
+    label_weights = {}
+    for lab, w in zip(labels, weights):
+        label_weights[lab] = label_weights.get(lab, 0.0) + float(w)
+    return max(label_weights.items(), key=lambda kv: kv[1])[0]
+
+def predict(model, product_name: str, supplier: str, top_k: int = 20):
+    """
+    Predict Item_Category and Spend_Category for a new line.
+    product_name -> used as Item_Description text
+    """
+    supplier = supplier or ""
+    product_name = product_name or ""
+
+    text_in = _clean_text(f"{supplier} | {product_name}")
+
+    # Default fallbacks (if text is empty or vectorizer not available)
+    fallback_item = model["sup_mode_item"].get(supplier) or model["df"]["Item_Category"].mode().iat[0]
+    fallback_spend = model["sup_mode_spend"].get(supplier) or model["df"]["Spend_Category"].mode().iat[0]
+
+    if model["vectorizer"] is None or model["X"] is None or text_in == "":
+        return {
+            "Item_Category": fallback_item,
+            "Spend_Category": fallback_spend,
+            "method": "supplier_mode_fallback",
+            "support": None,
+        }
+
+    x = model["vectorizer"].transform([text_in])
+    # Cosine sim for TF-IDF is the dot product, because vectors are L2-normalized by default
+    sim = (model["X"] @ x.T).toarray().ravel()
+
+    # Take top-k neighbours with positive similarity
+    idx = np.argsort(-sim)[:top_k]
+    sims = sim[idx]
+    # filter out zero sims
+    mask = sims > 0
+    if not mask.any():
+        return {
+            "Item_Category": fallback_item,
+            "Spend_Category": fallback_spend,
+            "method": "supplier_mode_fallback",
+            "support": None,
+        }
+
+    idx = idx[mask]
+    sims = sims[mask]
+
+    cats = model["df"].iloc[idx]["Item_Category"].values
+    spends = model["df"].iloc[idx]["Spend_Category"].values
+
+    pred_item = _weighted_majority(cats, sims)
+    pred_spend = _weighted_majority(spends, sims)
+
+    return {
+        "Item_Category": pred_item,
+        "Spend_Category": pred_spend,
+        "method": f"tfidf_knn_top{len(idx)}",
+        "support": {
+            "top_examples": model["df"].iloc[idx][
+                ["Supplier", "Item_Description", "Item_Category", "Spend_Category"]
+            ].assign(similarity=np.round(sims, 3)).to_dict(orient="records")
+        },
+    }
+
+
+def _build_text_column(df: pd.DataFrame) -> pd.Series:
+    # Combine Supplier and Item_Description as model text
+    sup = df.get("Supplier", "").fillna("").astype(str)
+    desc = df.get("Item_Description", "").fillna("").astype(str)
+    text = (sup + " | " + desc).map(_clean_text)
+    return text
+
 
 def pareto_figure_from_series(series: pd.Series, title: str, topn: int = 15):
     """
@@ -368,7 +496,7 @@ def forecast_by_category_timeseries_simple(df: pd.DataFrame,
 # ---------------------------
 # Page & Theme
 # ---------------------------
-tabs = st.tabs(["💸 Dashboard", "📈 Forecasting","🤝 Supplier Optimization"])
+tabs = st.tabs(["💸 Dashboard", "📈 Forecasting","🤝 Supplier Optimization","🗂️ Auto Categorize"])
 with tabs[0]:
     st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout="wide")
     # ---------------------------
@@ -1261,4 +1389,13 @@ with tabs[2]:
     Default weights: **Cost 40%**, **Reliability 30%**, **Risk 20%**, **Volume 10%**.
     """)
         
+with tabs[3]:
+    st.header("🗂️ Auto Categorize")
+    st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
+    
+    prod = st.text_input("Product name (Item_Description)")
+    sup = st.selectbox("Supplier", options=sorted(base_df["Supplier"].dropna().unique())
 
+    model = fit_memory(base_df)
+    predict(model, prod, sup, top_k=20)
+    st.json(pr)
