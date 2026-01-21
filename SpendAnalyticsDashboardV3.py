@@ -1397,6 +1397,6 @@ with tabs[3]:
     sup = st.selectbox("Supplier", options=sorted(base_df["Supplier"].dropna().unique()))
 
     model = fit_memory(base_df)
-    if st.button("Predict & Append"):
+    if st.button("Categorize the product"):
         pr = predict(model, prod, sup, top_k=20)
         st.json(pr)
