@@ -3,4 +3,7 @@ pandas>=2.0
 plotly>=5.20
 numpy>=1.25
 statsmodels>=0.13.0
-
+os
+re
+json
+sklearn>=1.80
