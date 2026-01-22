@@ -54,7 +54,7 @@ def fit_memory(df: pd.DataFrame):
     }
 
     if len(d) > 0:
-        vect = TfidfVectorizer(min_df=1, ngram_range=(1, 4))  # unigrams+bigrams
+        vect = TfidfVectorizer(min_df=1, ngram_range=(1, 2))  # unigrams+bigrams
         X = vect.fit_transform(text.values)
         model["vectorizer"] = vect
         model["X"] = X
