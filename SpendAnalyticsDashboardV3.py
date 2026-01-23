@@ -21,94 +21,109 @@ def _clean_text(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-def fit_memory(df: pd.DataFrame):
-    """
-    Prepare the in-memory structures used for fast nearest-neighbour classification.
-    Returns a dict with everything needed by predict().
-    """
-    d = df.copy()
+import numpy as np
+import openai
 
-    # Keep only rows with known categories
+# choose your embedding model
+EMBED_MODEL = "text-embedding-3-small"
+
+def get_embedding(text: str):
+    """
+    Convert text into an LLM-generated embedding.
+    """
+    if not text:
+        return np.zeros(1536)  # model dimension fallback
+    text = text.replace("\n", " ")
+    resp = openai.embeddings.create(
+        model=EMBED_MODEL,
+        input=text
+    )
+    return np.array(resp.data[0].embedding, dtype=float)
+
+
+def fit_memory(df: pd.DataFrame):
+    d = df.copy()
     d = d[(d["Item_Category"].notna()) & (d["Spend_Category"].notna())].copy()
 
-    # Basic fallbacks by supplier frequency
     sup_mode_item = (
         d.groupby("Supplier")["Item_Category"]
-        .agg(lambda s: s.value_counts(dropna=True).index[0])
+        .agg(lambda s: s.value_counts().index[0])
         .to_dict()
     )
+
     sup_mode_spend = (
         d.groupby("Supplier")["Spend_Category"]
-        .agg(lambda s: s.value_counts(dropna=True).index[0])
+        .agg(lambda s: s.value_counts().index[0])
         .to_dict()
     )
 
     text = _build_text_column(d)
 
+    # --- TF-IDF ---
+    vect = TfidfVectorizer(min_df=1, ngram_range=(2, 5))
+    X = vect.fit_transform(text.values)
+
+    # --- LLM Embeddings ---
+    embeddings = np.vstack([get_embedding(t) for t in text])
+
     model = {
         "df": d,
         "sup_mode_item": sup_mode_item,
         "sup_mode_spend": sup_mode_spend,
-        "vectorizer": None,
-        "X": None,
+        "vectorizer": vect,
+        "X": X,
+        "embeddings": embeddings
     }
-
-    if len(d) > 0:
-        vect = TfidfVectorizer(min_df=1, ngram_range=(3, 5))  # unigrams+bigrams
-        X = vect.fit_transform(text.values)
-        model["vectorizer"] = vect
-        model["X"] = X
-
     return model
 
-def _weighted_majority(labels: np.ndarray, weights: np.ndarray):
-    # Return label with max total weight (ties broken by overall frequency)
-    label_weights = {}
-    for lab, w in zip(labels, weights):
-        label_weights[lab] = label_weights.get(lab, 0.0) + float(w)
-    return max(label_weights.items(), key=lambda kv: kv[1])[0]
+
+
+from numpy.linalg import norm
+
+def cosine_sim(a, b):
+    return float(np.dot(a, b) / (norm(a) * norm(b) + 1e-10))
 
 def predict(model, product_name: str, supplier: str, top_k: int = 20):
-    """
-    Predict Item_Category and Spend_Category for a new line.
-    product_name -> used as Item_Description text
-    """
+
     supplier = supplier or ""
     product_name = product_name or ""
 
-    text_in = _clean_text(f"{supplier} | {product_name}")
+    text_in = _clean_text(f"{supplier} {product_name}")
 
-    # Default fallbacks (if text is empty or vectorizer not available)
+    # fallbacks
     fallback_item = model["sup_mode_item"].get(supplier) or model["df"]["Item_Category"].mode().iat[0]
     fallback_spend = model["sup_mode_spend"].get(supplier) or model["df"]["Spend_Category"].mode().iat[0]
 
-    if model["vectorizer"] is None or model["X"] is None or text_in == "":
+    if not text_in:
         return {
             "Item_Category": fallback_item,
             "Spend_Category": fallback_spend,
-            "method": "supplier_mode_fallback",
-            "support": None,
+            "method": "fallback-empty-text"
         }
 
-    x = model["vectorizer"].transform([text_in])
-    # Cosine sim for TF-IDF is the dot product, because vectors are L2-normalized by default
-    sim = (model["X"] @ x.T).toarray().ravel()
+    # --- TF-IDF similarity ---
+    x_tfidf = model["vectorizer"].transform([text_in])
+    sim_tfidf = (model["X"] @ x_tfidf.T).toarray().ravel()
 
-    # Take top-k neighbours with positive similarity
-    idx = np.argsort(-sim)[:top_k]
-    sims = sim[idx]
-    # filter out zero sims
-    mask = sims > 0
-    if not mask.any():
+    # --- LLM embedding similarity ---
+    embed_in = get_embedding(text_in)
+    sim_embed = np.array([
+        cosine_sim(embed_in, emb) for emb in model["embeddings"]
+    ])
+
+    # --- Final hybrid similarity ---
+    sim_final = 0.5 * sim_tfidf + 0.5 * sim_embed
+
+    # select top-k
+    idx = np.argsort(-sim_final)[:top_k]
+    sims = sim_final[idx]
+
+    if np.all(sims <= 0):
         return {
             "Item_Category": fallback_item,
             "Spend_Category": fallback_spend,
-            "method": "supplier_mode_fallback",
-            "support": None,
+            "method": "fallback-no-similarity"
         }
-
-    idx = idx[mask]
-    sims = sims[mask]
 
     cats = model["df"].iloc[idx]["Item_Category"].values
     spends = model["df"].iloc[idx]["Spend_Category"].values
@@ -119,14 +134,13 @@ def predict(model, product_name: str, supplier: str, top_k: int = 20):
     return {
         "Item_Category": pred_item,
         "Spend_Category": pred_spend,
-        "method": f"tfidf_knn_top{len(idx)}",
+        "method": "hybrid-llm-tfidf",
         "support": {
             "top_examples": model["df"].iloc[idx][
                 ["Supplier", "Item_Description", "Item_Category", "Spend_Category"]
             ].assign(similarity=np.round(sims, 3)).to_dict(orient="records")
-        },
+        }
     }
-
 
 def _build_text_column(df: pd.DataFrame) -> pd.Series:
     # Combine Supplier and Item_Description as model text
