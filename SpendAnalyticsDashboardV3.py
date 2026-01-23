@@ -6,7 +6,8 @@ import numpy as np
 from datetime import datetime, date, timedelta
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.feature_extraction.text import TfidfVectorizer
-
+from sentence_transformers import SentenceTransformer
+from numpy.linalg import norm
 
 import plotly.graph_objects as go
 import os
@@ -22,23 +23,16 @@ def _clean_text(s: str) -> str:
     return s
 
 import numpy as np
-import openai
 
-# choose your embedding model
-EMBED_MODEL = "text-embedding-3-small"
+# Load once at startup (fast)
+embed_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 def get_embedding(text: str):
-    """
-    Convert text into an LLM-generated embedding.
-    """
+    """Generate a local embedding using MiniLM."""
     if not text:
-        return np.zeros(1536)  # model dimension fallback
-    text = text.replace("\n", " ")
-    resp = openai.embeddings.create(
-        model=EMBED_MODEL,
-        input=text
-    )
-    return np.array(resp.data[0].embedding, dtype=float)
+        return np.zeros(384)  # MiniLM dimension
+    return embed_model.encode(text, convert_to_numpy=True)
+
 
 
 def fit_memory(df: pd.DataFrame):
@@ -75,10 +69,6 @@ def fit_memory(df: pd.DataFrame):
         "embeddings": embeddings
     }
     return model
-
-
-
-from numpy.linalg import norm
 
 def cosine_sim(a, b):
     return float(np.dot(a, b) / (norm(a) * norm(b) + 1e-10))
