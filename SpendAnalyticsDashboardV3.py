@@ -73,7 +73,7 @@ def fit_memory(df: pd.DataFrame):
 def cosine_sim(a, b):
     return float(np.dot(a, b) / (norm(a) * norm(b) + 1e-10))
 
-def predict(model, product_name: str, supplier: str, top_k: int = 20):
+def predict(model, product_name: str, supplier: str, top_k: int = 5):
 
     supplier = supplier or ""
     product_name = product_name or ""
