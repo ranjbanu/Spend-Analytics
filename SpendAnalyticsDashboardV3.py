@@ -152,7 +152,7 @@ def predict(model, product_name: str, supplier: str, top_k: int = 5):
         "support": {
             "top_examples": model["df"].iloc[idx][
                 ["Supplier", "Item_Description", "Item_Category", "Spend_Category"]
-            ].assign(similarity=np.round(sims, 3)).to_dict(orient="records")
+            ].assign(similarity=np.round(sims, 3)).head(3).to_dict(orient="records")
         }
     }
 
