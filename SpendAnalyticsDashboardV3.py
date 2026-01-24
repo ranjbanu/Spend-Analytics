@@ -1394,13 +1394,13 @@ with tabs[2]:
     """)
         
 with tabs[3]:
+    model = fit_memory(base_df)
     st.header("🗂️ Auto Categorize")
     st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
     
     prod = st.text_input("Product name (Item_Description)")
     sup = st.selectbox("Supplier", options=sorted(base_df["Supplier"].dropna().unique()))
-
-    model = fit_memory(base_df)
+    
     buttonpressed = st.button("Categorize the product")
     if buttonpressed:
         pr = predict(model, prod, sup, top_k=20)
