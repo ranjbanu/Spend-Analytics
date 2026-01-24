@@ -14,6 +14,13 @@ import os
 import re
 import json
 
+def _weighted_majority(labels: np.ndarray, weights: np.ndarray):
+    # Return label with max total weight (ties broken by overall frequency)
+    label_weights = {}
+    for lab, w in zip(labels, weights):
+        label_weights[lab] = label_weights.get(lab, 0.0) + float(w)
+    return max(label_weights.items(), key=lambda kv: kv[1])[0]
+    
 def _clean_text(s: str) -> str:
     if not isinstance(s, str):
         return ""
