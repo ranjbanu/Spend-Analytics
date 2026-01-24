@@ -1396,7 +1396,7 @@ with tabs[2]:
 with tabs[3]:
     st.header("🗂️ Auto Categorize")
     st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
-    buttonpressed = st.button("Categorize the product"):
+    buttonpressed = st.button("Categorize the product")
     
     prod = st.text_input("Product name (Item_Description)")
     sup = st.selectbox("Supplier", options=sorted(base_df["Supplier"].dropna().unique()))
