@@ -111,17 +111,34 @@ def predict(model, product_name: str, supplier: str, top_k: int = 5):
     # --- Final hybrid similarity ---
     sim_final = 0.5 * sim_tfidf + 0.5 * sim_embed
 
-    # select top-k
-    idx = np.argsort(-sim_final)[:top_k]
-    sims = sim_final[idx]
 
-    if np.all(sims <= 0):
+
+    sim_final = np.nan_to_num(sim_final, nan=0.0, posinf=0.0, neginf=0.0)
+    idx_all = np.argsort(-sim_final)
+    idx_top = idx_all[:top_k]
+    sims_top = sim_final[idx_top]
+
+    # keep only strictly positive sims (0 means no similarity)
+    mask = sims_top > 0
+    if not np.any(mask):
         return {
             "Item_Category": fallback_item,
             "Spend_Category": fallback_spend,
-            "method": "fallback-no-similarity"
+            "method": "supplier_mode_fallback_no_sim",
+            "support": None,
         }
 
+    idx = idx_top[mask]
+    sims = sims_top[mask]
+
+    # Guard: if something still goes wrong, fallback cleanly
+    if len(idx) == 0:
+        return {
+            "Item_Category": fallback_item,
+            "Spend_Category": fallback_spend,
+            "method": "supplier_mode_fallback_mask_empty",
+            "support": None,
+        }
     cats = model["df"].iloc[idx]["Item_Category"].values
     spends = model["df"].iloc[idx]["Spend_Category"].values
 
