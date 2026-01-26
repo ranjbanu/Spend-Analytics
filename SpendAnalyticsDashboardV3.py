@@ -29,8 +29,6 @@ def _clean_text(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-import numpy as np
-
 # Load once at startup (fast)
 embed_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
@@ -226,10 +224,6 @@ def pareto_figure_from_series(series: pd.Series, title: str, topn: int = 15):
 
 
 # ---------- Supplier Optimization: KPIs + Scoring ----------
-
-import pandas as pd
-import numpy as np
-
 def _use_negotiated(df_in: pd.DataFrame) -> pd.DataFrame:
     d = df_in.copy()
     if "Negotiated_Price" in d.columns:
@@ -619,7 +613,8 @@ with tabs[0]:
     base_df = df.copy() 
     max_inv_date = pd.to_datetime(df["Invoice_Date"]).max()
     min_inv_date = pd.to_datetime(df["Invoice_Date"]).min()
-    
+    # Model fitting to auto categorizing the product
+    model = fit_memory(base_df)
     # ---------------------------
     # Sidebar (global filters)
     # ---------------------------
@@ -1418,7 +1413,6 @@ with tabs[2]:
     """)
         
 with tabs[3]:
-    model = fit_memory(base_df)
     st.header("🗂️ Auto Categorize")
     st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
     
