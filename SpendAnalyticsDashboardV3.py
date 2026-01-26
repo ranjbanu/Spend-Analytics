@@ -613,8 +613,7 @@ with tabs[0]:
     base_df = df.copy() 
     max_inv_date = pd.to_datetime(df["Invoice_Date"]).max()
     min_inv_date = pd.to_datetime(df["Invoice_Date"]).min()
-    # Model fitting to auto categorizing the product
-    model = fit_memory(base_df)
+
     # ---------------------------
     # Sidebar (global filters)
     # ---------------------------
@@ -1413,6 +1412,8 @@ with tabs[2]:
     """)
         
 with tabs[3]:
+    # Model fitting to auto categorizing the product
+    model = fit_memory(base_df)
     st.header("🗂️ Auto Categorize")
     st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
     
