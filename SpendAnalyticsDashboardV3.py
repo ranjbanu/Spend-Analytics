@@ -112,13 +112,6 @@ def predict(model, product_name: str, supplier: str, top_k: int = 5):
 
     # keep only strictly positive sims (0 means no similarity)
     mask = sims_top > 0
-    if not np.any(mask):
-        return {
-            "Item_Category": fallback_item,
-            "Spend_Category": fallback_spend,
-            "method": "supplier_mode_fallback_no_sim",
-            "support": None,
-        }
 
     idx = idx_top[mask]
     sims = sims_top[mask]
@@ -140,11 +133,10 @@ def predict(model, product_name: str, supplier: str, top_k: int = 5):
     return {
         "Item_Category": pred_item,
         "Spend_Category": pred_spend,
-        "method": "hybrid-llm-tfidf",
         "support": {
             "top_examples": model["df"].iloc[idx][
                 ["Supplier", "Item_Description", "Item_Category", "Spend_Category"]
-            ].assign(similarity=np.round(sims, 3)).head(3).to_dict(orient="records")
+            ].assign(similarity=np.round(sims, 1)).head(1).to_dict(orient="records")
         }
     }
 
