@@ -86,15 +86,15 @@ def predict(model, product_name: str, supplier: str, top_k: int = 5):
     text_in = _clean_text(f"{supplier} {product_name}")
 
     # fallbacks
-    fallback_item = model["sup_mode_item"].get(supplier) or model["df"]["Item_Category"].mode().iat[0]
-    fallback_spend = model["sup_mode_spend"].get(supplier) or model["df"]["Spend_Category"].mode().iat[0]
+     fallback_item = model["sup_mode_item"].get(supplier) or model["df"]["Item_Category"].mode().iat[0]
+     fallback_spend = model["sup_mode_spend"].get(supplier) or model["df"]["Spend_Category"].mode().iat[0]
 
-    if not text_in:
-        return {
-            "Item_Category": fallback_item,
-            "Spend_Category": fallback_spend,
-            "method": "fallback-empty-text"
-        }
+    #if not text_in:
+    #    return {
+    #        "Item_Category": fallback_item,
+    #        "Spend_Category": fallback_spend,
+    #        "method": "fallback-empty-text"
+    #    }
 
     # --- TF-IDF similarity ---
     x_tfidf = model["vectorizer"].transform([text_in])
