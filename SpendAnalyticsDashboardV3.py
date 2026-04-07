@@ -610,9 +610,6 @@ with tabs[0]:
         period = st.date_input("Period", value=(default_start, date.today()))
         cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
         sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
-        inc_cancelled = st.checkbox("Include cancelled invoices?", value=False)
-        only_addressable = st.checkbox("Only addressable (Approved_Category_Flag=='Yes')", value=False)
-        only_maverick = st.checkbox("Only maverick", value=False)
         apply = st.button("Apply filters")
     
     # ---------------------------
@@ -629,12 +626,6 @@ with tabs[0]:
             mask &= df["Item_Category"].isin(cats)
         if sups:
             mask &= df["Supplier"].isin(sups)
-        if not inc_cancelled:
-            mask &= ~df["is_cancelled"]
-        if only_addressable:
-            mask &= df["is_addressable"]
-        if only_maverick:
-            mask &= df["is_maverick"]
         return df[mask].copy()
     
     filtered = apply_filters(df) if apply else apply_filters(df)
@@ -970,12 +961,6 @@ with tabs[0]:
             mask &= df["Item_Category"].isin(cats)
         if sups:
             mask &= df["Supplier"].isin(sups)
-        if not inc_cancelled:
-            mask &= ~df["is_cancelled"]
-        if only_addressable:
-            mask &= df["is_addressable"]
-        if only_maverick:
-            mask &= df["is_maverick"]
         return df[mask].copy()
 
     def _compute_metrics(df_slice, start_d, end_d):
