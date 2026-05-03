@@ -1163,7 +1163,12 @@ with tabs[1]:
     #season = st.slider("Seasonal period (months)", 12, 24, 12, step=1)
     #min_points = st.slider("Minimum historical months per category", 3, 36, 6, step=1)
     exclude_cancelled = st.checkbox("Exclude 'Cancelled' invoices", value=True)
+
     
+    selected_category = st.selectbox(
+        "Select Item Category",
+        df_input["Item_Category"].unique()
+    )
     # Run forecast (SARIMA-only with seasonal-naive fallback)
     fc_ts_simple = forecast_by_category(    df_input,    category=selected_category,    horizon=horizon,    season=12)
 
