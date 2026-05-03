@@ -414,7 +414,7 @@ def forecast_by_category(
             "Month": pd.period_range(
                 series.index.max() + 1, periods=horizon, freq="M"
             ),
-            "Forecast": np.zeros(horizon)
+            "Forecast (in million)": np.zeros(horizon)
         })
 
     model = fit_sarima(series, season)
@@ -429,7 +429,7 @@ def forecast_by_category(
         "Month": pd.period_range(
             series.index.max() + 1, periods=horizon, freq="M"
         ),
-        "Forecast": forecast
+        "Forecast": forecast / 1000000
     })
 
 # ---------------------------
