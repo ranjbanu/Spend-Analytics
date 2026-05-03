@@ -1165,8 +1165,8 @@ with tabs[1]:
     exclude_cancelled = st.checkbox("Exclude 'Cancelled' invoices", value=True)
     
     # Run forecast (SARIMA-only with seasonal-naive fallback)
-    fc_ts_simple = forecast_by_category_timeseries_simple(
-        df_input, horizon=horizon, season=12, min_points=36, exclude_cancelled=exclude_cancelled
+    fc_ts_simple = forecast_by_category(
+        df_input, horizon=horizon, season=12
     )
     
     # Show
