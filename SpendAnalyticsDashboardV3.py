@@ -1180,7 +1180,7 @@ with tabs[1]:
     st.download_button(
         label="Download Forecast by Category (CSV)",
         data=fc_ts_simple.to_csv(index=False),
-        file_name=f"forecast_by_category_sarima_next_{horizon}_months.csv",
+        file_name=f"forecast_by_category{horizon}_months.csv",
         mime="text/csv"
     )
     
