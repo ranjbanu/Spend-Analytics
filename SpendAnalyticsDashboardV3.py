@@ -429,7 +429,7 @@ def forecast_by_category(
         "Month": pd.period_range(
             series.index.max() + 1, periods=horizon, freq="M"
         ),
-        "Forecast(in million)": round(forecast / 1000000,2)
+        "Forecast(in million)": np.round(forecast / 1000000,2)
     })
 
 # ---------------------------
