@@ -1192,7 +1192,7 @@ with tabs[1]:
     st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
     st.session_state["active_tab"] = "Forecast"
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
-    if st.session_state["active_tab"] == "Forecast":
+    if st.session_state.get("active_tab") == "Forecast":
         st.markdown(
             """
             <style>
