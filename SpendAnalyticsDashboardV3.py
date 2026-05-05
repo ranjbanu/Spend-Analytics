@@ -1189,6 +1189,27 @@ import streamlit as st
 
 
 with tabs[1]:
+    if st.session_state["active_tab"] == "Forecast":
+    st.markdown(
+        """
+        <style>
+            section[data-testid="stSidebar"] {display: none;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+else:       
+    # ✅ Explicitly re-enable sidebar for other tabs
+    st.markdown(
+        """
+        <style>
+            section[data-testid="stSidebar"] {
+                display: block;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
     st.session_state["active_tab"] = "Forecast"
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
@@ -1232,27 +1253,7 @@ with tabs[1]:
     - **Confidence intervals:** 80% and 95% from SARIMA; for the fallback we estimate bands using residual volatility vs seasonal lag.
     - **Rounding:** All values are rounded to **2 decimals**.
     """)
-    if st.session_state["active_tab"] == "Forecast":
-        st.markdown(
-            """
-            <style>
-                section[data-testid="stSidebar"] {display: none;}
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-    else:       
-        # ✅ Explicitly re-enable sidebar for other tabs
-        st.markdown(
-            """
-            <style>
-                section[data-testid="stSidebar"] {
-                    display: block;
-                }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
+
 
 with tabs[2]:
     st.header("🤝 Supplier Optimization")
