@@ -556,23 +556,7 @@ with tabs[0]:
     min_inv_date = pd.to_datetime(df["Invoice_Date"]).min()
 
   
-    # ---------------------------
-    # Apply filters
-    # ---------------------------
-    def apply_filters(df):
-        start, end = period if isinstance(period, tuple) else (default_start, date.today())
-        mask = pd.Series(True, index=df.index)
-        if start:
-            mask &= df["Invoice_Date"].dt.date >= start
-        if end:
-            mask &= df["Invoice_Date"].dt.date <= end
-        if cats:
-            mask &= df["Item_Category"].isin(cats)
-        if sups:
-            mask &= df["Supplier"].isin(sups)
-        return df[mask].copy()
-    
-    filtered = apply_filters(df) if apply else apply_filters(df)
+
     
     # ---------------------------
     # KPI calculations
@@ -1384,3 +1368,20 @@ with st.sidebar:
     cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
     sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
     apply = st.button("Apply filters")
+# ---------------------------
+# Apply filters
+# ---------------------------
+def apply_filters(df):
+    start, end = period if isinstance(period, tuple) else (default_start, date.today())
+    mask = pd.Series(True, index=df.index)
+    if start:
+        mask &= df["Invoice_Date"].dt.date >= start
+    if end:
+        mask &= df["Invoice_Date"].dt.date <= end
+    if cats:
+        mask &= df["Item_Category"].isin(cats)
+    if sups:
+        mask &= df["Supplier"].isin(sups)
+    return df[mask].copy()
+
+filtered = apply_filters(df) if apply else apply_filters(df)
