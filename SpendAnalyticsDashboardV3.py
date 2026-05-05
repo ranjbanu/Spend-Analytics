@@ -13,6 +13,12 @@ import plotly.graph_objects as go
 import os
 import re
 import json
+tabs = st.tabs([
+    "Dashboard",
+    "Forecast",
+    "Supplier Optimization",
+    "Auto Categorize"
+])
 
 def _weighted_majority(labels: np.ndarray, weights: np.ndarray):
     # Return label with max total weight (ties broken by overall frequency)
