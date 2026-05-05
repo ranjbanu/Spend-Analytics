@@ -352,7 +352,10 @@ def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_PPV_Pct: floa
 
 
 def ensure_monthly_series(df, category):
-    d = df[df["Item_Category"] == category].copy()
+    if category == "All":
+        d=df[df["Item_Category"]].copy()
+    else:
+        d = df[df["Item_Category"] == category].copy()
     
     d["Invoice_Date"] = pd.to_datetime(
         d["Invoice_Date"], dayfirst=True, errors="coerce"
@@ -1153,8 +1156,8 @@ import streamlit as st
 
 
 with tabs[1]:
-    st.header("📈 Time-series Forecast (SARIMA): Category Spend for Next Quarter")
-    st.caption("Forecast monthly spend by Item Category for the next quarter. View results in a table and download as CSV.")
+    st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
+    st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
     # Choose training data slice
     df_input = base_df.copy()
     
@@ -1165,10 +1168,15 @@ with tabs[1]:
     exclude_cancelled = st.checkbox("Exclude 'Cancelled' invoices", value=True)
 
     
+
+    categories = sorted(df_input["Item_Category"].dropna().unique().tolist())
+    categories = ["All"] + categories
+    
     selected_category = st.selectbox(
         "Select Item Category",
-        df_input["Item_Category"].unique()
+        categories
     )
+
     # Run forecast (SARIMA-only with seasonal-naive fallback)
     fc_ts_simple = forecast_by_category(    df_input,    category=selected_category,    horizon=horizon,    season=12)
 
