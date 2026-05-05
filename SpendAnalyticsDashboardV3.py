@@ -554,10 +554,36 @@ with tabs[0]:
     base_df = df.copy() 
     max_inv_date = pd.to_datetime(df["Invoice_Date"]).max()
     min_inv_date = pd.to_datetime(df["Invoice_Date"]).min()
-
-  
-
+    # ---------------------------
+    # Sidebar (global filters)
+    # ---------------------------
     
+    with st.sidebar:
+        st.header("Filters")
+        # Period selector
+        default_start = (max_inv_date - pd.DateOffset(months=12)).date() if pd.notnull(max_inv_date) else date.today() - timedelta(days=365)
+        period = st.date_input("Period", value=(default_start, date.today()))
+        cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
+        sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
+        apply = st.button("Apply filters")
+    # ---------------------------
+    # Apply filters
+    # ---------------------------
+    def apply_filters(df):
+        start, end = period if isinstance(period, tuple) else (default_start, date.today())
+        mask = pd.Series(True, index=df.index)
+        if start:
+            mask &= df["Invoice_Date"].dt.date >= start
+        if end:
+            mask &= df["Invoice_Date"].dt.date <= end
+        if cats:
+            mask &= df["Item_Category"].isin(cats)
+        if sups:
+            mask &= df["Supplier"].isin(sups)
+        return df[mask].copy()
+    
+    filtered = apply_filters(df) if apply else apply_filters(df)
+   
     # ---------------------------
     # KPI calculations
     # ---------------------------
@@ -1335,53 +1361,4 @@ with tabs[3]:
     if buttonpressed:
         pr = predict(model, prod, sup, top_k=20)
         st.json(pr)
-if st.session_state.get("active_tab") == "Forecast":
-    st.markdown(
-        """
-        <style>
-            section[data-testid="stSidebar"] {display: none;}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-else:       
-    # ✅ Explicitly re-enable sidebar for other tabs
-    st.markdown(
-        """
-        <style>
-            section[data-testid="stSidebar"] {
-                display: block;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-# ---------------------------
-# Sidebar (global filters)
-# ---------------------------
 
-with st.sidebar:
-    st.header("Filters")
-    # Period selector
-    default_start = (max_inv_date - pd.DateOffset(months=12)).date() if pd.notnull(max_inv_date) else date.today() - timedelta(days=365)
-    period = st.date_input("Period", value=(default_start, date.today()))
-    cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
-    sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
-    apply = st.button("Apply filters")
-# ---------------------------
-# Apply filters
-# ---------------------------
-def apply_filters(df):
-    start, end = period if isinstance(period, tuple) else (default_start, date.today())
-    mask = pd.Series(True, index=df.index)
-    if start:
-        mask &= df["Invoice_Date"].dt.date >= start
-    if end:
-        mask &= df["Invoice_Date"].dt.date <= end
-    if cats:
-        mask &= df["Item_Category"].isin(cats)
-    if sups:
-        mask &= df["Supplier"].isin(sups)
-    return df[mask].copy()
-
-filtered = apply_filters(df) if apply else apply_filters(df)
