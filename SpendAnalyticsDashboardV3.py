@@ -542,14 +542,12 @@ with tabs[0]:
 
     with st.sidebar:
         st.header("Filters")
-    
-        # Only show filters when NOT in Forecast tab
-        if "📈 Forecast" not in st.session_state.get("active_tab", ""):
-            business_unit = st.selectbox("Business Unit", bu_list)
-            supplier = st.multiselect("Supplier", supplier_list)
-            date_range = st.date_input("Date Range", [start_date, end_date])
-        else:
-            st.info("Filters are disabled in Forecast view")
+        # Period selector
+        default_start = (max_inv_date - pd.DateOffset(months=12)).date() if pd.notnull(max_inv_date) else date.today() - timedelta(days=365)
+        period = st.date_input("Period", value=(default_start, date.today()))
+        cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
+        sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
+        apply = st.button("Apply filters")
 
     
     # ---------------------------
@@ -1167,7 +1165,15 @@ with tabs[1]:
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
     # Choose training data slice
     df_input = base_df.copy()
-    
+    st.markdown(
+        """
+        <style>
+            section[data-testid="stSidebar"] {display: none;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     # Controls
     horizon = st.slider("Forecast horizon (months)", 1, 12, 3, step=1)
     #season = st.slider("Seasonal period (months)", 12, 24, 12, step=1)
