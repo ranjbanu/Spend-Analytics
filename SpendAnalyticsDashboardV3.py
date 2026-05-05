@@ -461,6 +461,17 @@ tabs = st.tabs(["💸 Dashboard", "📈 Forecasting","🤝 Supplier Optimization
 with tabs[0]:
     st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout="wide")
     st.session_state["active_tab"] = "Dashboard"
+    # ✅ Explicitly re-enable sidebar for other tabs
+    st.markdown(
+        """
+        <style>
+            section[data-testid="stSidebar"] {
+                display: block;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     # ---------------------------
     # Utils: currency formatting
     # ---------------------------
@@ -1192,19 +1203,6 @@ with tabs[1]:
             """,
             unsafe_allow_html=True
         )
-    else:
-        # ✅ Explicitly re-enable sidebar for other tabs
-        st.markdown(
-            """
-            <style>
-                section[data-testid="stSidebar"] {
-                    display: block;
-                }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
 
     # Controls
     horizon = st.slider("Forecast horizon (months)", 1, 12, 3, step=1)
@@ -1248,7 +1246,17 @@ with tabs[2]:
     st.header("🤝 Supplier Optimization")
     st.session_state["active_tab"] = "Supplier Optimization"
     st.caption("Recommend the best supplier per category using cost, reliability, risk, and volume fit. Weights are tunable.")
-
+    # ✅ Explicitly re-enable sidebar for other tabs
+    st.markdown(
+        """
+        <style>
+            section[data-testid="stSidebar"] {
+                display: block;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     # --- Inputs ---
     wcost = 40 #st.slider("Weight: Cost (PPV)", 0, 100, 40, step=5)
     wrel  = 30 #st.slider("Weight: Reliability (OTD)", 0, 100, 30, step=5)
@@ -1377,7 +1385,17 @@ with tabs[3]:
     st.header("🗂️ Auto Categorize")
     st.session_state["active_tab"] = "Auto Categorize"
     st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
-    
+    # ✅ Explicitly re-enable sidebar for other tabs
+    st.markdown(
+        """
+        <style>
+            section[data-testid="stSidebar"] {
+                display: block;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )    
     prod = st.text_input("Product name (Item_Description)")
     sup = st.selectbox("Supplier", options=sorted(base_df["Supplier"].dropna().unique()))
     
