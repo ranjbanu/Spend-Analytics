@@ -1189,6 +1189,9 @@ import streamlit as st
 
 
 with tabs[1]:
+    st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
+    st.session_state["active_tab"] = "Forecast"
+    st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
     if st.session_state["active_tab"] == "Forecast":
     st.markdown(
         """
@@ -1210,9 +1213,6 @@ with tabs[1]:
         """,
         unsafe_allow_html=True
     )
-    st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
-    st.session_state["active_tab"] = "Forecast"
-    st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
     # Choose training data slice
     df_input = base_df.copy()
 
