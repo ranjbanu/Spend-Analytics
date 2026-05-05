@@ -577,7 +577,27 @@ with tabs[0]:
         cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
         sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
         apply = st.button("Apply filters")
-
+        if st.session_state.get("active_tab") == "Forecast":
+            st.markdown(
+                """
+                <style>
+                    section[data-testid="stSidebar"] {display: none;}
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+        else:       
+            # ✅ Explicitly re-enable sidebar for other tabs
+            st.markdown(
+                """
+                <style>
+                    section[data-testid="stSidebar"] {
+                        display: block;
+                    }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
     
     # ---------------------------
     # Apply filters
@@ -1192,27 +1212,6 @@ with tabs[1]:
     st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
     st.session_state["active_tab"] = "Forecast"
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
-    if st.session_state.get("active_tab") == "Forecast":
-        st.markdown(
-            """
-            <style>
-                section[data-testid="stSidebar"] {display: none;}
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-    else:       
-        # ✅ Explicitly re-enable sidebar for other tabs
-        st.markdown(
-            """
-            <style>
-                section[data-testid="stSidebar"] {
-                    display: block;
-                }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
     # Choose training data slice
     df_input = base_df.copy()
 
