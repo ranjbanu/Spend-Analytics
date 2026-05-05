@@ -1193,26 +1193,26 @@ with tabs[1]:
     st.session_state["active_tab"] = "Forecast"
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
     if st.session_state["active_tab"] == "Forecast":
-    st.markdown(
-        """
-        <style>
-            section[data-testid="stSidebar"] {display: none;}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            """
+            <style>
+                section[data-testid="stSidebar"] {display: none;}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
     else:       
-    # ✅ Explicitly re-enable sidebar for other tabs
-    st.markdown(
-        """
-        <style>
-            section[data-testid="stSidebar"] {
-                display: block;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+        # ✅ Explicitly re-enable sidebar for other tabs
+        st.markdown(
+            """
+            <style>
+                section[data-testid="stSidebar"] {
+                    display: block;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
     # Choose training data slice
     df_input = base_df.copy()
 
