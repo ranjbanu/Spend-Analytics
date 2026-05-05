@@ -1198,7 +1198,7 @@ with tabs[1]:
         """,
         unsafe_allow_html=True
     )
-else:       
+    else:       
     # ✅ Explicitly re-enable sidebar for other tabs
     st.markdown(
         """
