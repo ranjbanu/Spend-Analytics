@@ -1183,14 +1183,15 @@ with tabs[1]:
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
     # Choose training data slice
     df_input = base_df.copy()
-    st.markdown(
-        """
-        <style>
-            section[data-testid="stSidebar"] {display: none;}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    if st.session_state["active_tab"] == "📈 Forecast":
+        st.markdown(
+            """
+            <style>
+                section[data-testid="stSidebar"] {display: none;}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
 
     # Controls
     horizon = st.slider("Forecast horizon (months)", 1, 12, 3, step=1)
