@@ -442,6 +442,7 @@ def forecast_by_category(
 tabs = st.tabs(["💸 Dashboard", "📈 Forecasting","🤝 Supplier Optimization","🗂️ Auto Categorize"])
 with tabs[0]:
     st.set_page_config(page_title="Spend Analytics & P2P", page_icon="💸", layout="wide")
+    st.session_state["active_tab"] = "Dashboard"
     # ---------------------------
     # Utils: currency formatting
     # ---------------------------
@@ -538,14 +539,18 @@ with tabs[0]:
     # ---------------------------
     # Sidebar (global filters)
     # ---------------------------
+
     with st.sidebar:
         st.header("Filters")
-        # Period selector
-        default_start = (max_inv_date - pd.DateOffset(months=12)).date() if pd.notnull(max_inv_date) else date.today() - timedelta(days=365)
-        period = st.date_input("Period", value=(default_start, date.today()))
-        cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
-        sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
-        apply = st.button("Apply filters")
+    
+        # Only show filters when NOT in Forecast tab
+        if "📈 Forecast" not in st.session_state.get("active_tab", ""):
+            business_unit = st.selectbox("Business Unit", bu_list)
+            supplier = st.multiselect("Supplier", supplier_list)
+            date_range = st.date_input("Date Range", [start_date, end_date])
+        else:
+            st.info("Filters are disabled in Forecast view")
+
     
     # ---------------------------
     # Apply filters
@@ -1158,6 +1163,7 @@ import streamlit as st
 
 with tabs[1]:
     st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
+    st.session_state["active_tab"] = "📈 Forecast"
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
     # Choose training data slice
     df_input = base_df.copy()
@@ -1202,6 +1208,7 @@ with tabs[1]:
 
 with tabs[2]:
     st.header("🤝 Supplier Optimization")
+    st.session_state["active_tab"] = "Supplier Optimization"
     st.caption("Recommend the best supplier per category using cost, reliability, risk, and volume fit. Weights are tunable.")
 
     # --- Inputs ---
@@ -1330,6 +1337,7 @@ with tabs[3]:
     # Model fitting to auto categorizing the product
     model = fit_memory(base_df)
     st.header("🗂️ Auto Categorize")
+    st.session_state["active_tab"] = "Auto Categorize"
     st.caption("Auto categorizes a given product into its category.  Product description and supplier to be selected.")
     
     prod = st.text_input("Product name (Item_Description)")
