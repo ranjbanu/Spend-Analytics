@@ -13,12 +13,6 @@ import plotly.graph_objects as go
 import os
 import re
 import json
-tabs = st.tabs([
-    "Dashboard",
-    "Forecast",
-    "Supplier Optimization",
-    "Auto Categorize"
-])
 
 def _weighted_majority(labels: np.ndarray, weights: np.ndarray):
     # Return label with max total weight (ties broken by overall frequency)
@@ -561,20 +555,7 @@ with tabs[0]:
     max_inv_date = pd.to_datetime(df["Invoice_Date"]).max()
     min_inv_date = pd.to_datetime(df["Invoice_Date"]).min()
 
-    # ---------------------------
-    # Sidebar (global filters)
-    # ---------------------------
-
-    with st.sidebar:
-        st.header("Filters")
-        # Period selector
-        default_start = (max_inv_date - pd.DateOffset(months=12)).date() if pd.notnull(max_inv_date) else date.today() - timedelta(days=365)
-        period = st.date_input("Period", value=(default_start, date.today()))
-        cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
-        sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
-        apply = st.button("Apply filters")
-
-    
+  
     # ---------------------------
     # Apply filters
     # ---------------------------
@@ -1391,3 +1372,15 @@ else:
         """,
         unsafe_allow_html=True
     )
+# ---------------------------
+# Sidebar (global filters)
+# ---------------------------
+
+with st.sidebar:
+    st.header("Filters")
+    # Period selector
+    default_start = (max_inv_date - pd.DateOffset(months=12)).date() if pd.notnull(max_inv_date) else date.today() - timedelta(days=365)
+    period = st.date_input("Period", value=(default_start, date.today()))
+    cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
+    sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
+    apply = st.button("Apply filters")
