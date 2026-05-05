@@ -408,33 +408,51 @@ def fallback_forecast(series, horizon):
     avg = last_values.mean()
     return np.maximum(np.repeat(avg, horizon), 0)
 
+
 def forecast_by_category(
-    df, category, horizon=3, season=12
+    df,
+    category="All",
+    horizon=3,
+    season=12
 ):
-    series = ensure_monthly_series(df, category)
+    results = []
 
-    if series.dropna().sum() == 0:
-        return pd.DataFrame({
-            "Month": pd.period_range(
-                series.index.max() + 1, periods=horizon, freq="M"
-            ),
-            "Forecast": np.zeros(horizon)
-        })
-
-    model = fit_sarima(series, season)
-
-    if model:
-        forecast = model.forecast(horizon)
-        forecast = np.maximum(forecast.values, 0)
+    # ✅ Decide which categories to forecast
+    if category == "All" or category is None:
+        categories = sorted(df["Item_Category"].dropna().unique())
     else:
-        forecast = fallback_forecast(series, horizon)
+        categories = [category]
 
-    return pd.DataFrame({
-        "Month": pd.period_range(
-            series.index.max() + 1, periods=horizon, freq="M"
-        ),
-        "Forecast(in million)": np.round(forecast / 1000000,2)
-    })
+    for cat in categories:
+        # --- Build monthly series per category ---
+        series = ensure_monthly_series(df, cat)
+
+        # Skip empty categories safely
+        if series.empty or series.dropna().sum() == 0:
+            forecast = np.zeros(horizon)
+        else:
+            model = fit_sarima(series, season)
+            if model:
+                forecast = np.maximum(model.forecast(horizon).values, 0)
+            else:
+                forecast = fallback_forecast(series, horizon)
+
+        # --- Build future months ---
+        last_month = series.index.max()
+        future_months = pd.period_range(
+            last_month + 1, periods=horizon, freq="M"
+        )
+
+        # --- Append rows ---
+        for m, f in zip(future_months, forecast):
+            results.append({
+                "Month": m,
+                "Category": cat,
+                "Forecast (Million)": round(f / 1_000_000, 2)
+            })
+
+    return pd.DataFrame(results)
+
 
 # ---------------------------
 # Page & Theme
