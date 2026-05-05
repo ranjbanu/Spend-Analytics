@@ -1192,6 +1192,19 @@ with tabs[1]:
             """,
             unsafe_allow_html=True
         )
+    else:
+        # ✅ Explicitly re-enable sidebar for other tabs
+        st.markdown(
+            """
+            <style>
+                section[data-testid="stSidebar"] {
+                    display: block;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
 
     # Controls
     horizon = st.slider("Forecast horizon (months)", 1, 12, 3, step=1)
