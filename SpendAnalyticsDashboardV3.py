@@ -352,8 +352,9 @@ def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_PPV_Pct: floa
 
 
 def ensure_monthly_series(df, category):
-    if category == "All":
-        d=df[df["Item_Category"]].copy()
+
+    if category is None or category == "All":
+        d = df.copy()
     else:
         d = df[df["Item_Category"] == category].copy()
     
