@@ -351,16 +351,14 @@ def score_suppliers(kpis_df: pd.DataFrame, weights: dict, cost_mix_PPV_Pct: floa
 # =========================
 
 
-def ensure_monthly_series(df, category):
 
-    if category is None or category == "All":
-        d = df.copy()
-    else:
-        d = df[df["Item_Category"] == category].copy()
-    
+def ensure_monthly_series(df):
+    d = df.copy()
+
     d["Invoice_Date"] = pd.to_datetime(
         d["Invoice_Date"], dayfirst=True, errors="coerce"
     )
+
     d = d.dropna(subset=["Invoice_Date", "Invoice_Amount"])
 
     series = (
@@ -370,10 +368,11 @@ def ensure_monthly_series(df, category):
         .astype(float)
     )
 
-    # Reindex but DO NOT force zero spend
-    idx = pd.period_range(series.index.min(), series.index.max(), freq="M")
-    return series.reindex(idx)
+    if not series.empty:
+        idx = pd.period_range(series.index.min(), series.index.max(), freq="M")
+        series = series.reindex(idx)
 
+    return series
 
 def fit_sarima(series, season=12):
     y = series.dropna()
@@ -409,25 +408,18 @@ def fallback_forecast(series, horizon):
     return np.maximum(np.repeat(avg, horizon), 0)
 
 
-def forecast_by_category(
-    df,
-    category="All",
-    horizon=3,
-    season=12
-):
+
+def forecast_by_category(df, horizon=3, season=12):
     results = []
 
-    # ✅ Decide which categories to forecast
-    if category == "All" or category is None:
-        categories = sorted(df["Item_Category"].dropna().unique())
-    else:
-        categories = [category]
+    # ✅ Categories come from the FILTERED dataframe
+    categories = sorted(df["Item_Category"].dropna().unique())
 
     for cat in categories:
-        # --- Build monthly series per category ---
-        series = ensure_monthly_series(df, cat)
+        df_cat = df[df["Item_Category"] == cat]
 
-        # Skip empty categories safely
+        series = ensure_monthly_series(df_cat)
+
         if series.empty or series.dropna().sum() == 0:
             forecast = np.zeros(horizon)
         else:
@@ -437,13 +429,10 @@ def forecast_by_category(
             else:
                 forecast = fallback_forecast(series, horizon)
 
-        # --- Build future months ---
-        last_month = series.index.max()
         future_months = pd.period_range(
-            last_month + 1, periods=horizon, freq="M"
+            series.index.max() + 1, periods=horizon, freq="M"
         )
 
-        # --- Append rows ---
         for m, f in zip(future_months, forecast):
             results.append({
                 "Month": m,
@@ -1175,43 +1164,28 @@ with tabs[0]:
 import streamlit as st
 
 
-with tabs[1]:
-    st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
-    st.session_state["active_tab"] = "Forecast"
-    st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
 
-    # ✅ Horizon is a MODEL parameter → belongs here
+with tabs[1]:
+    st.header("📈 Time-series Forecast")
+    st.session_state["active_tab"] = "Forecast"
+
     horizon = st.slider(
         "Forecast Horizon (months)",
-        min_value=1,
-        max_value=12,
-        value=3,
-        step=1
+        1, 12, 3
     )
 
-    # ✅ Read sidebar filters
-    selected_category = st.session_state.get("selected_category", "All")
-    date_range = st.session_state.get("selected_date_range")
+    # ✅ USE FILTERED DATA ONLY
+    df_input = st.session_state.get("df_filtered", base_df)
 
-    # ✅ Apply date filter
-    df_input = base_df.copy()
-    if date_range:
-        df_input = df_input[
-            (df_input["Invoice_Date"] >= pd.to_datetime(date_range[0])) &
-            (df_input["Invoice_Date"] <= pd.to_datetime(date_range[1]))
-        ]
-
-    # ✅ Forecast using sidebar-selected category
     fc_ts = forecast_by_category(
         df_input,
-        category=selected_category,
-        horizon=3,
+        horizon=horizon,
         season=12
     )
 
     st.dataframe(fc_ts)
 
-    
+   
     # Download CSV
     st.download_button(
         label="Download Forecast by Category (CSV)",
