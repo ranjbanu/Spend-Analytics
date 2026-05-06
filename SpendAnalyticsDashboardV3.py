@@ -1178,7 +1178,7 @@ with tabs[1]:
     )
 
     # ✅ Use SAME filtered dataframe as other tabs
-    df_input = st.session_state.get("df_filtered", base_df)
+    df_input = st.session_state.get("df_filtered", filtered)
 
     fc_ts = forecast_by_category(
         df_input,
