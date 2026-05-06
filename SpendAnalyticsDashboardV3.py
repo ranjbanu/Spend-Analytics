@@ -560,8 +560,8 @@ with tabs[0]:
     df_filtered = base_df.copy()
     
     # Category filter
-    selected_category = st.session_state.get("selected_category", "All")
-    if selected_category != "All":
+    selected_category = st.session_state.get("Item Category", "Select all")
+    if selected_category != "Select all":
         df_filtered = df_filtered[
             df_filtered["Item_Category"] == selected_category
         ]
