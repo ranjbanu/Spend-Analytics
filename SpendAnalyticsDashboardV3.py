@@ -1179,31 +1179,29 @@ with tabs[1]:
     st.header("📈 Time-series Forecast (SARIMA): Category Spend for the selected horizon")
     st.session_state["active_tab"] = "Forecast"
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
-    # Choose training data slice
+
+    # ✅ Read sidebar filters
+    selected_category = st.session_state.get("selected_category", "All")
+    date_range = st.session_state.get("selected_date_range")
+
+    # ✅ Apply date filter
     df_input = base_df.copy()
+    if date_range:
+        df_input = df_input[
+            (df_input["Invoice_Date"] >= pd.to_datetime(date_range[0])) &
+            (df_input["Invoice_Date"] <= pd.to_datetime(date_range[1]))
+        ]
 
-    # Controls
-    horizon = st.slider("Forecast horizon (months)", 1, 12, 3, step=1)
-    #season = st.slider("Seasonal period (months)", 12, 24, 12, step=1)
-    #min_points = st.slider("Minimum historical months per category", 3, 36, 6, step=1)
-    exclude_cancelled = st.checkbox("Exclude 'Cancelled' invoices", value=True)
-
-    
-
-    categories = sorted(df_input["Item_Category"].dropna().unique().tolist())
-    categories = ["All"] + categories
-    
-    selected_category = st.selectbox(
-        "Select Item Category",
-        categories
+    # ✅ Forecast using sidebar-selected category
+    fc_ts = forecast_by_category(
+        df_input,
+        category=selected_category,
+        horizon=3,
+        season=12
     )
 
-    # Run forecast (SARIMA-only with seasonal-naive fallback)
-    fc_ts_simple = forecast_by_category(    df_input,    category=selected_category,    horizon=horizon,    season=12)
+    st.dataframe(fc_ts)
 
-    
-    # Show
-    st.dataframe(fc_ts_simple, use_container_width=True)
     
     # Download CSV
     st.download_button(
