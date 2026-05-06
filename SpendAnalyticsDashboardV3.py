@@ -555,6 +555,28 @@ with tabs[0]:
         cats = st.multiselect("Item Category", options=sorted(df["Item_Category"].dropna().unique().tolist()))
         sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
         apply = st.button("Apply filters")
+ 
+ # ✅ Build filtered dataframe ONCE from sidebar filters
+    df_filtered = base_df.copy()
+    
+    # Category filter
+    selected_category = st.session_state.get("selected_category", "All")
+    if selected_category != "All":
+        df_filtered = df_filtered[
+            df_filtered["Item_Category"] == selected_category
+        ]
+    
+    # Date filter
+    date_range = st.session_state.get("selected_date_range")
+    if date_range:
+        df_filtered = df_filtered[
+            (df_filtered["Invoice_Date"] >= pd.to_datetime(date_range[0])) &
+            (df_filtered["Invoice_Date"] <= pd.to_datetime(date_range[1]))
+        ]
+    
+    # ✅ Store for all tabs
+    st.session_state["df_filtered"] = df_filtered
+   
     # ---------------------------
     # Apply filters
     # ---------------------------
