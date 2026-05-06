@@ -1215,7 +1215,7 @@ with tabs[1]:
     # Download CSV
     st.download_button(
         label="Download Forecast by Category (CSV)",
-        data=fc_ts_simple.to_csv(index=False),
+        data=fc_ts.to_csv(index=False),
         file_name=f"forecast_by_category{horizon}_months.csv",
         mime="text/csv"
     )
