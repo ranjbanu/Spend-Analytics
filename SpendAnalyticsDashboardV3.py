@@ -409,10 +409,11 @@ def fallback_forecast(series, horizon):
 
 
 
+
 def forecast_by_category(df, horizon=3, season=12):
     results = []
 
-    # ✅ Categories come from the FILTERED dataframe
+    # Categories come ONLY from filtered dataframe
     categories = sorted(df["Item_Category"].dropna().unique())
 
     for cat in categories:
@@ -441,7 +442,6 @@ def forecast_by_category(df, horizon=3, season=12):
             })
 
     return pd.DataFrame(results)
-
 
 # ---------------------------
 # Page & Theme
@@ -556,27 +556,7 @@ with tabs[0]:
         sups = st.multiselect("Supplier", options=sorted(df["Supplier"].dropna().unique().tolist()))
         apply = st.button("Apply filters")
  
- # ✅ Build filtered dataframe ONCE from sidebar filters
-    df_filtered = base_df.copy()
-    
-    # Category filter
-    selected_category = st.session_state.get("Item Category", "Select all")
-    if selected_category != "Select all":
-        df_filtered = df_filtered[
-            df_filtered["Item_Category"] == selected_category
-        ]
-    
-    # Date filter
-    date_range = st.session_state.get("selected_date_range")
-    if date_range:
-        df_filtered = df_filtered[
-            (df_filtered["Invoice_Date"] >= pd.to_datetime(date_range[0])) &
-            (df_filtered["Invoice_Date"] <= pd.to_datetime(date_range[1]))
-        ]
-    
-    # ✅ Store for all tabs
-    st.session_state["df_filtered"] = df_filtered
-   
+  
     # ---------------------------
     # Apply filters
     # ---------------------------
@@ -1187,6 +1167,7 @@ import streamlit as st
 
 
 
+
 with tabs[1]:
     st.header("📈 Time-series Forecast")
     st.session_state["active_tab"] = "Forecast"
@@ -1196,7 +1177,7 @@ with tabs[1]:
         1, 12, 3
     )
 
-    # ✅ USE FILTERED DATA ONLY
+    # ✅ Use SAME filtered dataframe as other tabs
     df_input = st.session_state.get("df_filtered", base_df)
 
     fc_ts = forecast_by_category(
@@ -1206,7 +1187,6 @@ with tabs[1]:
     )
 
     st.dataframe(fc_ts)
-
    
     # Download CSV
     st.download_button(
