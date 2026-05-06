@@ -1180,6 +1180,15 @@ with tabs[1]:
     st.session_state["active_tab"] = "Forecast"
     st.caption("Forecast monthly spend by Item Category for the selected horizon. View results in a table and download as CSV.")
 
+    # ✅ Horizon is a MODEL parameter → belongs here
+    horizon = st.slider(
+        "Forecast Horizon (months)",
+        min_value=1,
+        max_value=12,
+        value=3,
+        step=1
+    )
+
     # ✅ Read sidebar filters
     selected_category = st.session_state.get("selected_category", "All")
     date_range = st.session_state.get("selected_date_range")
