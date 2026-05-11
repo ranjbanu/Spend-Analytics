@@ -430,8 +430,20 @@ def forecast_by_category(df, horizon=3, season=12):
             else:
                 forecast = fallback_forecast(series, horizon)
 
+
+        anchor_month = (
+            df["Invoice_Date"]
+            .max()
+            .to_period("M")
+        )
+        
+        # ✅ Skip the immediate next month
+        start_month = anchor_month + 2
+        
         future_months = pd.period_range(
-            series.index.max() + 1, periods=horizon, freq="M"
+            start=start_month,
+            periods=horizon,
+            freq="M"
         )
 
         for m, f in zip(future_months, forecast):
