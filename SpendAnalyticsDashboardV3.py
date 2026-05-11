@@ -438,7 +438,7 @@ def forecast_by_category(df, horizon=3, season=12):
         )
         
         # ✅ Skip the immediate next month
-        start_month = anchor_month + 2
+        start_month = anchor_month + 1
         
         future_months = pd.period_range(
             start=start_month,
