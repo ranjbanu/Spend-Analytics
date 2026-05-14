@@ -1141,8 +1141,8 @@ with tabs[0]:
             st.download_button("Download CA by Supplier (Current, CSV)", data=current["CA_by_sup"].to_csv(index=False), file_name="ca_by_supplier_current.csv", mime="text/csv")
     st.divider()
 
-    # Working Capital: Monthly DPO
-    st.subheader("Working Capital: Monthly Weighted DPO")
+    # Monthly DPO
+    st.subheader("Monthly Weighted DPO")
     monthly_curr = current["monthly_dpo"]; monthly_curr["Period"] = "Current"
     if compare_prev and previous is not None and not previous["monthly_dpo"].empty:
         monthly_prev = previous["monthly_dpo"].copy(); monthly_prev["Period"] = "Previous"
